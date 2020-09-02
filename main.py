@@ -137,7 +137,7 @@ def visualizeSingleBatch(fp_loader_test, opt):
     return
 
 # Configure data loader
-rooms_path = '~/dataset/'
+rooms_path = '/home/tony_chen_x19/dataset/'
 fp_dataset_train = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set)
 fp_loader = torch.utils.data.DataLoader(fp_dataset_train, 
                                         batch_size=opt.batch_size, 
