@@ -253,7 +253,7 @@ for epoch in range(opt.n_epochs):
             # Score fake images
             if multi_gpu:
                 fake_validity = data_parallel(discriminator, \
-                                             (gen_ach segmentation mask imks, given_nds, \
+                                              (gen_mks, given_nds, \
                                               given_eds, nd_to_sample), \
                                               indices)
             else:
