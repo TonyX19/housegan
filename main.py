@@ -275,8 +275,10 @@ for epoch in range(opt.n_epochs):
             print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
                 % (epoch, opt.n_epochs, i, len(fp_loader), d_loss.item(), g_loss.item()))
 
+            print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
             if (batches_done % opt.sample_interval == 0) and batches_done:
                 torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
+                print("checkpoints save done")
                 visualizeSingleBatch(fp_loader_test, opt)
 
             batches_done += opt.n_critic
