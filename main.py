@@ -30,7 +30,7 @@ parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of firs
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
-parser.add_argument("--sample_interval", type=int, default=10, help="interval between image sampling")
+parser.add_argument("--sample_interval", type=int, default=50000, help="interval between image sampling")
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
@@ -272,8 +272,8 @@ for epoch in range(opt.n_epochs):
             g_loss.backward()
             optimizer_G.step()
 
-            print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, i, len(fp_loader), d_loss.item(), g_loss.item()))
+            print("[Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f]"
+                % (epoch, opt.n_epochs, i,batches_done, len(fp_loader), d_loss.item(), g_loss.item()))
 
             #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
             if (batches_done % opt.sample_interval == 0) and batches_done:
