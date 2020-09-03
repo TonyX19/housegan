@@ -22,6 +22,7 @@ from models import Discriminator, Generator, compute_gradient_penalty, weights_i
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--optim", type=str, default='adam', help="adam: learning rate")
 parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -137,7 +138,7 @@ def visualizeSingleBatch(fp_loader_test, opt):
     return
 
 # Configure data loader
-rooms_path = '/home/tony_chen_x19/dataset/'
+rooms_path = '/home/tony_chen_x19/dataset/' # replace with your dataset path need abs path
 fp_dataset_train = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set)
 fp_loader = torch.utils.data.DataLoader(fp_dataset_train, 
                                         batch_size=opt.batch_size, 
@@ -153,8 +154,15 @@ fp_loader_test = torch.utils.data.DataLoader(fp_dataset_test,
                                         collate_fn=floorplan_collate_fn)
 
 # Optimizers
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.g_lr, betas=(opt.b1, opt.b2)) 
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.d_lr, betas=(opt.b1, opt.b2))
+if opt.optim == 'adam' :
+    optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.g_lr, betas=(opt.b1, opt.b2)) 
+    optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.d_lr, betas=(opt.b1, opt.b2))
+else:
+    #RMSprop
+    optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=opt.g_lr,alpha=0.9) 
+    optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=opt.d_lr, alpha=0.9)
+
+
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 # ----------
