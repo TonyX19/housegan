@@ -37,7 +37,7 @@ parser.add_argument("--img_size", type=int, default=32, help="size of each image
 parser.add_argument("--with_boundary", action='store_true', default=True, help="include floorplan footprint")
 parser.add_argument("--num_variations", type=int, default=10, help="number of variations")
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
-
+parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
 
 opt = parser.parse_args()
 print(opt)
@@ -89,12 +89,10 @@ def draw_floorplan(dwg, junctions, juncs_on, lines_on):
     return 
 
 
-# Initialize variables
-rooms_path = '/local-scratch/nnauata/autodesk/FloorplanDataset/'
 
 # Configure data loader
-rooms_path = '/local-scratch/nnauata/autodesk/FloorplanDataset/'
-fp_dataset = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), split='eval')
+rooms_path = '/Users/home/Dissertation/Code/house-gan/dataset_paper/'
+fp_dataset = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), split='eval',target_set=opt.target_set)
 fp_loader = torch.utils.data.DataLoader(fp_dataset, 
                                         batch_size=opt.batch_size, 
                                         shuffle=False,
