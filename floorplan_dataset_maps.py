@@ -82,13 +82,17 @@ class FloorplanGraphDataset(Dataset):
 		min_N = sets[self.target_set][0]
 		max_N = sets[self.target_set][1]
 		filtered_subgraphs = []
+		print("all graph vectos: %s"% len(self.subgraphs))
 		for g in self.subgraphs:
+			# if len(g[0]) != len(g[1]):
+			# 	print("room_type_num:%s vector_num:%s" %(len(g[0]),len(g[1])))
 			rooms_type = g[0]    
 			in_set = (len(rooms_type) >= min_N) and (len(rooms_type) <= max_N)
 			if (split == 'train') and (in_set == False):
 				filtered_subgraphs.append(g)
 			elif (split == 'eval') and (in_set == True):
 				filtered_subgraphs.append(g)
+		print("filted set:%s" % len(filtered_subgraphs))		
 		self.subgraphs = filtered_subgraphs
 		if split == 'eval':
 			self.subgraphs = self.subgraphs[:5000] # max 5k
@@ -113,10 +117,10 @@ class FloorplanGraphDataset(Dataset):
 		rooms_bbs = graph[1]
 
 		if self.augment:
-			rot = random.randint(0, 3)*90.0
+			rot = random.randint(0, 3)*90.0 # 270 degree rotation
 			flip = random.randint(0, 1) == 1
 			rooms_bbs_aug = []
-			for bb in rooms_bbs:
+			for bb in rooms_bbs:  #bb[0..3] respect to 4 coordinates x,y
 				x0, y0 = self.flip_and_rotate(np.array([bb[0], bb[1]]), flip, rot)
 				x1, y1 = self.flip_and_rotate(np.array([bb[2], bb[3]]), flip, rot)
 				xmin, ymin = min(x0, x1), min(y0, y1)
@@ -132,7 +136,7 @@ class FloorplanGraphDataset(Dataset):
 		rooms_bbs = rooms_bbs/256.0
 
 		# extract boundary box and centralize
-		tl = np.min(rooms_bbs[:, :2], 0)
+		tl = np.min(rooms_bbs[:, :2], 0) #
 		br = np.max(rooms_bbs[:, 2:], 0)
 		shift = (tl+br)/2.0 - 0.5
 		rooms_bbs[:, :2] -= shift
@@ -150,23 +154,25 @@ class FloorplanGraphDataset(Dataset):
 				x0, y0, x1, y1 = im_size*bb
 				x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
 				rooms_mks[k, x0:x1+1, y0:y1+1] = 1.0
-		
+
 		nodes = one_hot_embedding(nodes)[:, 1:]
 		nodes = torch.FloatTensor(nodes)
 		edges = torch.LongTensor(edges)
 		rooms_mks = torch.FloatTensor(rooms_mks)
+		#rooms_mks = np.array(rooms_mks)
 		rooms_mks = self.transform(rooms_mks)
+		print(rooms_mks.shape)
 		return rooms_mks, nodes, edges
         
 	def flip_and_rotate(self, v, flip, rot, shape=256.):
-		v = self.rotate(np.array((shape, shape)), v, rot)
+		v = self.rotate(np.array((shape, shape)), v, rot) #array([shape,shape])
 		if flip:
 			x, y = v
 			v = (shape/2-abs(shape/2-x), y) if x > shape/2 else (shape/2+abs(shape/2-x), y)
 		return v
 	
 	# rotate coords
-	def rotate(self, image_shape, xy, angle):
+	def rotate(self, image_shape, xy, angle):# angle ---> rot degree
 		org_center = (image_shape-1)/2.
 		rot_center = (image_shape-1)/2.
 		org = xy-org_center
@@ -176,7 +182,7 @@ class FloorplanGraphDataset(Dataset):
 		new = new+rot_center
 		return new
 
-	def build_graph(self, bbs, types):
+	def build_graph(self, bbs, types): #relation graph
 		# create edges -- make order
 		triples = []
 		nodes = types
@@ -255,8 +261,11 @@ def floorplan_collate_fn(batch):
 	all_rooms_mks, all_nodes, all_edges = [], [], []
 	all_node_to_sample, all_edge_to_sample = [], []
 	node_offset = 0
-	for i, (rooms_mks, nodes, edges) in enumerate(batch):
+	for i, (rooms_mks, nodes, edges) in enumerate(batch):		
 		O, T = nodes.size(0), edges.size(0)
+		# if i == 1:
+		# 	print(rooms_mks.shape,nodes.shape,edges.shape)
+		# 	exit();
 		all_rooms_mks.append(rooms_mks)
 		all_nodes.append(nodes)
 		edges = edges.clone()
@@ -267,6 +276,7 @@ def floorplan_collate_fn(batch):
 		all_node_to_sample.append(torch.LongTensor(O).fill_(i))
 		all_edge_to_sample.append(torch.LongTensor(T).fill_(i))
 		node_offset += O
+	# exit();
 	all_rooms_mks = torch.cat(all_rooms_mks, 0)
 	all_nodes = torch.cat(all_nodes)
 	if len(all_edges) > 0:
