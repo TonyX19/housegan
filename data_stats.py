@@ -25,14 +25,15 @@ import svgwrite
 from models import Generator
 import networkx as nx
 import matplotlib.pyplot as plt
-from utils import ID_COLOR
+from utils import ID_COLOR,combine_images_maps
 from tqdm import tqdm
 from collections import defaultdict
+from torch.autograd import Variable
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches - does not support larger batchs")
+parser.add_argument("--batch_size", type=int, default=20, help="size of the batches - does not support larger batchs")
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
 parser.add_argument("--with_boundary", action='store_true', default=True, help="include floorplan footprint")
 parser.add_argument("--num_variations", type=int, default=10, help="number of variations")
@@ -41,6 +42,7 @@ parser.add_argument("--target_set", type=str, default='A', help="which split to 
 
 opt = parser.parse_args()
 print(opt)
+os.makedirs("./exps/"+exp_folder, exist_ok=True)
 
 def return_eq(node1, node2):
     return node1['label']==node2['label']
@@ -90,9 +92,12 @@ def draw_floorplan(dwg, junctions, juncs_on, lines_on):
 
 
 
+
 # Configure data loader
 rooms_path = '/Users/home/Dissertation/Code/house-gan/dataset_paper/'
 fp_dataset = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), split='eval',target_set=opt.target_set)
+#fp_dataset.subgraphs[0] = fp_dataset.subgraphs[1]
+# print(fp_dataset.subgraphs[1])
 fp_loader = torch.utils.data.DataLoader(fp_dataset, 
                                         batch_size=opt.batch_size, 
                                         shuffle=False,
@@ -104,15 +109,25 @@ fp_iter = tqdm(fp_loader, total=len(fp_dataset) // opt.batch_size + 1)
 cuda = False #True if torch.cuda.is_available() else False
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 graphs = []
-for i, batch in enumerate(fp_iter):
+for i, batch in enumerate(fp_loader):#len(fp_iter) = all_samples/batch_size
 
     # Unpack batch
-    mks, nds, eds, nd_to_sample, ed_to_sample = batch
-    real_nodes = np.where(nds.detach().cpu()==1)[-1]
-    graphs.append(len(real_nodes))
+    mks, nds, eds, nd_to_sample, ed_to_sample = batch #mks is all single batch sampls combined, 39 = sampl_1.len[=2] + sampl_2.len[=2]+...+sampl_25.len
+    
+    real_mks = Variable(mks.type(Tensor))
+    given_nds = Variable(nds.type(Tensor))
+    given_eds = eds
+    
+    real_imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds, \
+                                               nd_to_sample, ed_to_sample)
+    save_image(real_imgs_tensor, "/Users/home/Dissertation/Code/housegan/exps/{}/{}_real.png".format(opt.exp_folder, i), \
+                   nrow=12, normalize=False)
 
-samples_per_len = defaultdict(int)
-for g_len in graphs:
-    samples_per_len[g_len] += 1
+#     real_nodes = np.where(nds.detach().cpu()==1)[-1]
+#     graphs.append(len(real_nodes))
 
-print(samples_per_len)
+# samples_per_len = defaultdict(int)
+# for g_len in graphs:
+#     samples_per_len[g_len] += 1
+
+# print(samples_per_len)
