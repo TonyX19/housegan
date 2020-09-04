@@ -45,7 +45,8 @@ def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
     u = torch.FloatTensor(x.shape[0], 1, 1).to(device)
     u.data.resize_(x.shape[0], 1, 1)
     u.uniform_(0, 1)
-    x_both = x.data*u + x_fake.data*(1-u)
+    print("x.shape:%s, x_fake.shape:%s,nd_to_sample.shape:%s" % (x.shape,x_fake.shape,nd_to_sample.shape))
+    x_both = x.data*u + x_fake.data*(1-u)  # js distance
     x_both = x_both.to(device)
     x_both = Variable(x_both, requires_grad=True)
     grad_outputs = torch.ones(batch_size, 1).to(device)
@@ -126,8 +127,8 @@ class CMP(nn.Module):
         out = self.encoder(enc_in)
         return out
     
-        
-class Generator(nn.Module):
+         
+class Generator(nn.Module): ## extend nn.Module
     def __init__(self):
         super(Generator, self).__init__()
         self.init_size = 32 // 4
@@ -143,10 +144,14 @@ class Generator(nn.Module):
     
     def forward(self, z, given_y=None, given_w=None):
         z = z.view(-1, 128)
+        print('gen z shape:',z.shape)
+        print('given_y.shape:',given_y.shape)
         # include nodes
         if True:
             y = given_y.view(-1, 10)
             z = torch.cat([z, y], 1)
+        print("gen y,z shape",y.shape,z.shape)
+
         x = self.l1(z)      
         x = x.view(-1, 16, self.init_size, self.init_size)
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
@@ -155,6 +160,7 @@ class Generator(nn.Module):
         x = self.upsample_2(x)
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
         x = x.view(-1, *x.shape[2:])    
+        print("x shape:",x.shape)
         return x
 
 class Discriminator(nn.Module):
