@@ -96,7 +96,7 @@ class FloorplanGraphDataset(Dataset):
 		self.subgraphs = filtered_subgraphs
 		if split == 'eval':
 			self.subgraphs = self.subgraphs[:5000] # max 5k
-		print(len(self.subgraphs))   
+		# print(len(self.subgraphs))   
         
 		# doblecheck
 		deb_dic = defaultdict(int)
@@ -161,7 +161,7 @@ class FloorplanGraphDataset(Dataset):
 		rooms_mks = torch.FloatTensor(rooms_mks)
 		#rooms_mks = np.array(rooms_mks)
 		rooms_mks = self.transform(rooms_mks)
-		print(rooms_mks.shape)
+		# print(rooms_mks.shape)
 		return rooms_mks, nodes, edges
         
 	def flip_and_rotate(self, v, flip, rot, shape=256.):

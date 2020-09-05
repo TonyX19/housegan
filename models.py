@@ -47,7 +47,7 @@ def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
     u.data.resize_(x.shape[0], 1, 1)
     u.uniform_(0, 1)
     logging.debug("x.shape:%s, x_fake.shape:%s,nd_to_sample.shape:%s" % (str(x.shape),str(x_fake.shape),str(nd_to_sample.shape)))
-    x_both = x.data*u + x_fake.data*(1-u)  # js distance
+    x_both = x.data*u + x_fake.data*(1-u)
     x_both = x_both.to(device)
     x_both = Variable(x_both, requires_grad=True)
     grad_outputs = torch.ones(batch_size, 1).to(device)
