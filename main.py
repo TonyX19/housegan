@@ -211,8 +211,8 @@ if __name__ == '__main__':
             # Set grads on
             for p in discriminator.parameters():
                 p.requires_grad = True
-                # WGAN需要将判别器的参数绝对值截断到不超过一个固定常数c
-                p.data.clamp_(opt.clamp_lower, opt.clamp_upper)
+                # # WGAN需要将判别器的参数绝对值截断到不超过一个固定常数c
+                # p.data.clamp_(opt.clamp_lower, opt.clamp_upper)
                 
             # ---------------------
             #  Train Discriminator
