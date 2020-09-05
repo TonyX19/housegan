@@ -18,6 +18,8 @@ import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
 from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
@@ -34,7 +36,17 @@ parser.add_argument("--sample_interval", type=int, default=50000, help="interval
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
+parser.add_argument("--debug", type=bool, default=False, help="debug")
 opt = parser.parse_args()
+debug = opt.debug
+
+import logging
+if debug : ## debug variable impact the rest of packages
+    logging.basicConfig(level=logging.DEBUG)
+
+
+
+
 
 cuda = True if torch.cuda.is_available() else False
 lambda_gp = 10
@@ -137,6 +149,8 @@ def visualizeSingleBatch(fp_loader_test, opt):
                    nrow=12, normalize=False)
     return
 
+
+if __name__ == '__main__':
 # Configure data loader
 rooms_path = '/home/tony_chen_x19/dataset/' # replace with your dataset path need abs path
 fp_dataset_train = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set)
@@ -165,6 +179,8 @@ else:
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
+
+    print('training')
 # ----------
 #  Training
 # ----------
@@ -174,8 +190,8 @@ for epoch in range(opt.n_epochs):
         
         # Unpack batch
         mks, nds, eds, nd_to_sample, ed_to_sample = batch
+            logging.debug("mks: %s nds:%s nd_to_sample:%s" % (str(mks.shape),str(nds.shape),str(nd_to_sample.shape)))
         indices = nd_to_sample, ed_to_sample
-        
         # Adversarial ground truths
         batch_size = torch.max(nd_to_sample) + 1
         valid = Variable(Tensor(batch_size, 1)\
@@ -185,6 +201,7 @@ for epoch in range(opt.n_epochs):
     
         # Configure input
         real_mks = Variable(mks.type(Tensor))
+            logging.debug('real_mks: %s' % (str(real_mks.shape)))
         given_nds = Variable(nds.type(Tensor))
         given_eds = eds
         
@@ -198,8 +215,10 @@ for epoch in range(opt.n_epochs):
         optimizer_D.zero_grad()
 
         # Generate a batch of images
-        z_shape = [real_mks.shape[0], opt.latent_dim]
+            z_shape = [real_mks.shape[0], opt.latent_dim] # latent_dim ~ to map high dim space
+            logging.debug("z.shape %s" % (str(z_shape)))
         z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
+            logging.debug("z.shape after N %s" % (str(z.shape)))
         if multi_gpu:
             gen_mks = data_parallel(generator, (z, given_nds, given_eds), indices)
         else:
@@ -213,6 +232,11 @@ for epoch in range(opt.n_epochs):
                                           indices)
         else:
             real_validity = discriminator(real_mks, given_nds, given_eds, nd_to_sample)
+            # y=A(x), z=B(y) 求B中参数的梯度，不求A中参数的梯度
+            # # 第一种方法
+            # y = A(v1)
+            # z = B(y.detach()) # 直接用y的value 训练B(y)
+            # z.backward()
             
         # Fake images
         if multi_gpu:
@@ -273,7 +297,7 @@ for epoch in range(opt.n_epochs):
             optimizer_G.step()
 
             print("[Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, i,batches_done, len(fp_loader), d_loss.item(), g_loss.item()))
+                    % (epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item()))
 
             #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
             if (batches_done % opt.sample_interval == 0) and batches_done:

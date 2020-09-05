@@ -18,6 +18,7 @@ import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
 import torch.nn.utils.spectral_norm as spectral_norm
+import logging
 
 
 def add_pool(x, nd_to_sample):
@@ -45,7 +46,7 @@ def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
     u = torch.FloatTensor(x.shape[0], 1, 1).to(device)
     u.data.resize_(x.shape[0], 1, 1)
     u.uniform_(0, 1)
-    print("x.shape:%s, x_fake.shape:%s,nd_to_sample.shape:%s" % (x.shape,x_fake.shape,nd_to_sample.shape))
+    logging.debug("x.shape:%s, x_fake.shape:%s,nd_to_sample.shape:%s" % (str(x.shape),str(x_fake.shape),str(nd_to_sample.shape)))
     x_both = x.data*u + x_fake.data*(1-u)  # js distance
     x_both = x_both.to(device)
     x_both = Variable(x_both, requires_grad=True)
@@ -144,13 +145,13 @@ class Generator(nn.Module): ## extend nn.Module
     
     def forward(self, z, given_y=None, given_w=None):
         z = z.view(-1, 128)
-        print('gen z shape:',z.shape)
-        print('given_y.shape:',given_y.shape)
+        logging.debug('gen z shape: %s' % (str(z.shape)))
+        logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         # include nodes
         if True:
             y = given_y.view(-1, 10)
             z = torch.cat([z, y], 1)
-        print("gen y,z shape",y.shape,z.shape)
+        logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
 
         x = self.l1(z)      
         x = x.view(-1, 16, self.init_size, self.init_size)
@@ -160,7 +161,7 @@ class Generator(nn.Module): ## extend nn.Module
         x = self.upsample_2(x)
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
         x = x.view(-1, *x.shape[2:])    
-        print("x shape:",x.shape)
+        logging.debug("x shape: %s" % (str(x.shape)))
         return x
 
 class Discriminator(nn.Module):
