@@ -37,6 +37,8 @@ parser.add_argument("--exp_folder", type=str, default='exp', help="destination f
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
+parser.add_argument('--clamp_lower', type=float, default=-0.01)
+parser.add_argument('--clamp_upper', type=float, default=0.01)
 opt = parser.parse_args()
 debug = opt.debug
 
@@ -209,6 +211,8 @@ if __name__ == '__main__':
             # Set grads on
             for p in discriminator.parameters():
                 p.requires_grad = True
+                # WGAN需要将判别器的参数绝对值截断到不超过一个固定常数c
+                p.data.clamp_(opt.clamp_lower, opt.clamp_upper)
                 
             # ---------------------
             #  Train Discriminator
