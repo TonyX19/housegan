@@ -414,28 +414,31 @@ def calcLineDirectionPoints(points, line):
 
 def open_png(im_path, im_size=512):
 	
-	# open graph image
-	png = Image.open(im_path)
-	im = Image.new("RGB", png.size, (255, 255, 255))
-	im.paste(png, mask=png.split()[3])
-	w, h = im.size
-	
+  # open graph image
+  png = Image.open(im_path)
+  im = Image.new("RGB", png.size, (255, 255, 255))
+  idx = 3
+  if len(png.split()) < 4: #兼容gcloud
+    idx = 2
+  im.paste(png, mask=png.split()[idx])
+  w, h = im.size;print(png.split())
+
     # pad graph images
-	a = h/w
-	if w > h:
-		n_w = im_size
-		n_h = int(a*n_w)
-	else:
-		n_h = im_size
-		n_w = int(n_h/a)
-	im = im.resize((n_w, n_h))
-	delta_w = im_size - n_w
-	delta_h = im_size - n_h
-	padding = (delta_w//2, delta_h//2, delta_w-(delta_w//2), delta_h-(delta_h//2))
-	im = ImageOps.expand(im, padding, fill='white')
-	im_arr = np.array(im)
-	
-	return im_arr
+  a = h/w
+  if w > h:
+    n_w = im_size
+    n_h = int(a*n_w)
+  else:
+    n_h = im_size
+    n_w = int(n_h/a)
+  im = im.resize((n_w, n_h))
+  delta_w = im_size - n_w
+  delta_h = im_size - n_h
+  padding = (delta_w//2, delta_h//2, delta_w-(delta_w//2), delta_h-(delta_h//2))
+  im = ImageOps.expand(im, padding, fill='white')
+  im_arr = np.array(im)
+
+  return im_arr
 
 def draw_graph(nds, eds, shift, im_size=128):
 
