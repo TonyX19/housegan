@@ -82,8 +82,9 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size
                     b = BBox(axes_c)
                     iou_v = BBox.iou(a,b)
                     iou_list.append(iou_v)
+        
+        print(extracted_room_stats)
         if len(iou_list) == 0 :
-            print(extracted_room_stats)
             return 1.5;
         IOU_penalty = iuo_avg = np.mean(iou_list)
                 # print(BBox.iou(a,b))

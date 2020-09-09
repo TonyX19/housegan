@@ -1059,17 +1059,88 @@ def combine_images_bbs(bbs_batch, im_size=256):
     return all_imgs
 
 import webcolors
+def iou(a, b):
+  # [x1, y1, x2, y2]
+	# get area of a
+    area_a = (a[2] - a[0]) * (a[3] - a[1])
+	# get area of b
+    area_b = (b[2] - b[0]) * (b[3] - b[1])
+
+	# get left top x of IoU
+    iou_x1 = np.maximum(a[0], b[0])
+	# get left top y of IoU
+    iou_y1 = np.maximum(a[1], b[1])
+	# get right bottom of IoU
+    iou_x2 = np.minimum(a[2], b[2])
+	# get right bottom of IoU
+    iou_y2 = np.minimum(a[3], b[3])
+
+	# get width of IoU
+    iou_w = iou_x2 - iou_x1
+	# get height of IoU
+    iou_h = iou_y2 - iou_y1
+
+	# get area of IoU
+    area_iou = iou_w * iou_h
+	# get overlap ratio between IoU and all area
+    iou = abs(area_iou / (area_a + area_b - area_iou))
+    print(area_a,area_b,area_iou,iou)
+    return iou
+
+class BBox:
+    def __init__(self,axes):
+        x,y,x1,y1 = axes
+        self.x = x
+        self.y = y
+        self.x1 = x1
+        self.y1 = y1
+        self.w = x1 - x
+        self.h = y1 - y
+ 
+    def iou(a,b):
+
+        assert isinstance(a,BBox)
+        assert isinstance(b,BBox)
+        #print(a.w , a.h)
+        #print(b.w , b.h)
+        area_a = a.w * a.h
+        area_b = b.w * b.h
+        
+        w = min(b.x+b.w,a.x+a.w) - max(a.x,b.x)
+        h = min(b.y+b.h,a.y+a.h) - max(a.y,b.y)
+        #print(w,h)
+        
+        if w <= 0 or h <= 0:
+            return 0
+
+        area_c = w * h
+        #print(area_a,area_b,area_c)
+        return area_c / (area_a + area_b - area_c)
+
+
+def iou_2(box1,box2):
+      assert box1.size == 4 and box2.size == 4,"bounding box coordinate size must be 4"
+      bxmin = np.max(box1[0],box2[0])
+      bymin = np.max(box1[1],box2[1])
+      bxmax = np.min(box1[2],box2[2])
+      bymax = np.min(box1[3],box2[3])
+      bwidth = bxmax-bxmin
+      bhight = bymax-bxmin
+      inter = bwidth*bhight
+      union = (box1[2]-box1[0])*(box1[3]-box1[1])+(box2[2]-box2[0])*(box2[3]-box2[1])-inter
+      return inter/union
+
 def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
                         nd_to_sample, ed_to_sample, im_size=256):
     maps_batch = maps_batch.detach().cpu().numpy()
     nodes_batch = nodes_batch.detach().cpu().numpy()
     edges_batch = edges_batch.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
-    
+
     all_imgs = []
     shift = 0
     for b in range(batch_size):
-        inds_nd = np.where(nd_to_sample==b)
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index
         inds_ed = np.where(ed_to_sample==b)
         
         mks = maps_batch[inds_nd]
@@ -1085,8 +1156,35 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
             w = y1-y0
             if h > 0 and w > 0:
                 extracted_rooms.append([mk, (x0, y0, x1, y1), nd])
-        
-        # draw graph
+        # extracted_rooms_len = len(extracted_rooms)
+        # iou_list = []
+        # for i in range(extracted_rooms_len):
+        #     room = extracted_rooms[i]
+        #     mk, axes, nd = room
+        #     j = i+1
+        #     for j in range(j,extracted_rooms_len):
+        #         room_cmp = extracted_rooms[j]
+        #         mk_c,axes_c, nd_c = room_cmp
+        #         if not (nd_c == nd).all() :
+        #             a = BBox(axes)
+        #             b = BBox(axes_c)
+        #             iou_v = BBox.iou(a,b)
+        #             if iou_v > 0:
+        #                 print(nd_c,nd)
+        #             iou_list.append(iou_v)
+        #             # print(BBox.iou(a,b))
+        #             # print("-----------------")
+        #             #print("iou ",iou_2(np.array(axes),np.array(axes_c)))
+        #             #print(iou(axes,axes_c))
+        #             #print(nd_c,nd)
+        # # print(iou_list)
+        # # a = np.where(eds[:,1]>0)
+        # # rel = np.array(eds[a])
+        # # all_rr = np.concatenate((rel[:,0],rel[:,2]),0)
+        # # print(np.unique(all_rr))
+        # # print(len(extracted_rooms))
+        # # exit();
+        # # draw graph
         graph_img = draw_graph(nds, eds, shift, im_size=im_size)
         shift += len(nds)
         all_imgs.append(graph_img)
