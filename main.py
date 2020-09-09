@@ -125,7 +125,7 @@ def data_parallel(module, _input, indices):
 # discriminator.apply(weights_init_normal)
 
 # Visualize a single batch
-def visualizeSingleBatch(fp_loader_test, opt):
+def visualizeSingleBatch(fp_loader_test, opt,IUO_penalty=None):
     with torch.no_grad():
         # Unpack batch
         mks, nds, eds, nd_to_sample, ed_to_sample = next(iter(fp_loader_test))
@@ -145,9 +145,9 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
 
         # Save images
-        save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
+        save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,IUO_penalty), \
                    nrow=12, normalize=False)
-        save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
+        save_image(fake_imgs_tensor, "./exps/{}/{}_{}_fake.png".format(exp_folder, batches_done,IUO_penalty), \
                    nrow=12, normalize=False)
     return
 
@@ -307,7 +307,7 @@ if __name__ == '__main__':
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                     print("checkpoints save done")
-                    visualizeSingleBatch(fp_loader_test, opt)
+                    visualizeSingleBatch(fp_loader_test, opt,IUO_penalty)
 
                 batches_done += opt.n_critic
                 
