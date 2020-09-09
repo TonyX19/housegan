@@ -17,13 +17,13 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal
+from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--optim", type=str, default='adam', help="adam: learning rate")
 parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
@@ -154,7 +154,7 @@ def visualizeSingleBatch(fp_loader_test, opt):
 
 if __name__ == '__main__':
     # Configure data loader
-    rooms_path = '/home/tony_chen_x19/dataset/'  # replace with your dataset path need abs path
+    rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/' # replace with your dataset path need abs path
     fp_dataset_train = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set)
     fp_loader = torch.utils.data.DataLoader(fp_dataset_train, 
                                             batch_size=opt.batch_size, 
@@ -190,7 +190,6 @@ if __name__ == '__main__':
     batches_done = 0
     for epoch in range(opt.n_epochs):
         for i, batch in enumerate(fp_loader):
-            
             # Unpack batch
             mks, nds, eds, nd_to_sample, ed_to_sample = batch
             logging.debug("mks: %s nds:%s nd_to_sample:%s" % (str(mks.shape),str(nds.shape),str(nd_to_sample.shape)))
@@ -255,15 +254,15 @@ if __name__ == '__main__':
         
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                gradient_penalty,IUO_penalty = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data,\
-                                                            data_parallel, ed_to_sample.data)
+                                                             ed_to_sample.data,data_parallel)
             else:
-                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                gradient_penalty,IUO_penalty = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            None, None)
+                                                            ed_to_sample.data,None)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
                     + lambda_gp * gradient_penalty
 
@@ -301,8 +300,8 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f]"
-                    % (epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item()))
+                print("[Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [grad_p:%f] [IUO_p:%f]"
+                    % (epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),gradient_penalty,IUO_penalty))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:

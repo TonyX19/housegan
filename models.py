@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
-from utils import combine_images_maps, rectangle_renderer
+from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb
 import torch.nn.utils.spectral_norm as spectral_norm
 import logging
 
@@ -37,9 +37,83 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
+def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size=256):
+    IOU_penalty = 0;
+    maps_batch = x_fake.detach().cpu().numpy()
+    nodes_batch = given_y.detach().cpu().numpy()
+    edges_batch = given_w.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+
+    iou_list = []
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index
+        inds_ed = np.where(ed_to_sample==b)
+        
+        mks = maps_batch[inds_nd]
+        nds = nodes_batch[inds_nd]
+        eds = edges_batch[inds_ed]
+        
+        comb_img = np.ones((im_size, im_size, 3)) * 255
+        extracted_rooms = []
+        extracted_room_stats = []
+        for mk, nd in zip(mks, nds):
+            r =  im_size/mk.shape[-1]
+            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
+            h = x1-x0
+            w = y1-y0
+            # if ed_to_sample is None:
+            #     print(h,w)
+            extracted_room_stats.append((x0, y0, x1, y1))
+            if h > 0 and w > 0:
+                extracted_rooms.append([mk, (x0, y0, x1, y1), nd])
+
+        extracted_rooms_len = len(extracted_rooms)    
+        if extracted_rooms_len == 0 :
+            print(extracted_rooms_len)    
+        for i in range(extracted_rooms_len):
+            room = extracted_rooms[i]
+            mk, axes, nd = room
+            j = i+1
+            for j in range(j,extracted_rooms_len):
+                room_cmp = extracted_rooms[j]
+                mk_c,axes_c, nd_c = room_cmp
+                if not (nd_c == nd).all() :
+                    a = BBox(axes)
+                    b = BBox(axes_c)
+                    iou_v = BBox.iou(a,b)
+                    iou_list.append(iou_v)
+        if len(iou_list) == 0 :
+            print(extracted_room_stats)
+            return 1.5;
+        IOU_penalty = iuo_avg = np.mean(iou_list)
+                # print(BBox.iou(a,b))
+                # print("-----------------")
+                #print("iou ",iou_2(np.array(axes),np.array(axes_c)))
+                #print(iou(axes,axes_c))
+                #print(nd_c,nd)
+        # print(iou_list)
+        # a = np.where(eds[:,1]>0)
+        # rel = np.array(eds[a])
+        # all_rr = np.concatenate((rel[:,0],rel[:,2]),0)
+        # print(np.unique(all_rr))
+        # print(len(extracted_rooms))
+        # exit();
+        # draw graph
+
+    return IOU_penalty
+
+def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
+                             nd_to_sample=None, ed_to_sample=None, \
+                             data_parallel=None):
+    gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
+                             nd_to_sample, ed_to_sample, \
+                             data_parallel)
+    IOU_penalty = compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample)
+    return (gradient_penalty,IOU_penalty)
+
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
-                             nd_to_sample=None, data_parallel=None, \
-                             ed_to_sample=None):
+                             nd_to_sample=None, ed_to_sample=None, \
+                             data_parallel=None):
     indices = nd_to_sample, ed_to_sample
     batch_size = torch.max(nd_to_sample) + 1
     dtype, device = x.dtype, x.device
@@ -100,6 +174,7 @@ class CMP(nn.Module):
              
     def forward(self, feats, edges=None):
         
+        logging.debug("CMP:fea:%s,edgs:%s" % (str(feats.shape),str(edges.shape)))
         # allocate memory
         dtype, device = feats.dtype, feats.device
         edges = edges.view(-1, 3)
@@ -111,6 +186,7 @@ class CMP(nn.Module):
         pos_inds = torch.where(edges[:, 1] > 0)
         pos_v_src = torch.cat([edges[pos_inds[0], 0], edges[pos_inds[0], 2]]).long()
         pos_v_dst = torch.cat([edges[pos_inds[0], 2], edges[pos_inds[0], 0]]).long()
+        logging.debug("CMP:pos_v_src:%s" % (str(pos_v_src.shape)))
         pos_vecs_src = feats[pos_v_src.contiguous()]
         pos_v_dst = pos_v_dst.view(-1, 1, 1, 1).expand_as(pos_vecs_src).to(device)
         pooled_v_pos = pooled_v_pos.scatter_add(0, pos_v_dst, pos_vecs_src)
@@ -125,6 +201,7 @@ class CMP(nn.Module):
         
         # update nodes features
         enc_in = torch.cat([feats, pooled_v_pos, pooled_v_neg], 1)
+        logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
         out = self.encoder(enc_in)
         return out
     
@@ -144,6 +221,7 @@ class Generator(nn.Module): ## extend nn.Module
             *conv_block(128, 1, 3, 1, 1, act="tanh"))                                        
     
     def forward(self, z, given_y=None, given_w=None):
+        logging.debug('gen z shape: %s' % (str(z.shape)))
         z = z.view(-1, 128)
         logging.debug('gen z shape: %s' % (str(z.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
@@ -153,11 +231,15 @@ class Generator(nn.Module): ## extend nn.Module
             z = torch.cat([z, y], 1)
         logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
 
-        x = self.l1(z)      
+        x = self.l1(z)    
+        logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
         x = x.view(-1, 16, self.init_size, self.init_size)
+        logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
+        logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.upsample_1(x)
         x = self.cmp_2(x, given_w).view(-1, *x.shape[1:])   
+        logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.upsample_2(x)
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
         x = x.view(-1, *x.shape[2:])    
@@ -187,8 +269,10 @@ class Discriminator(nn.Module):
         self.fc_layer_local = nn.Sequential(nn.Linear(128, 1))
 
     def forward(self, x, given_y=None, given_w=None, nd_to_sample=None):
-
+        logging.debug('dis x shape: %s' % (str(x.shape)))
         x = x.view(-1, 1, 32, 32)
+        logging.debug('dis x shape: %s' % (str(x.shape)))
+        logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         # include nodes
         if True:
             y = self.l1(given_y)
