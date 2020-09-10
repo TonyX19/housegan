@@ -153,11 +153,15 @@ def visualizeSingleBatch(fp_loader_test, opt):
     return
 
 
-def visualizeBatch(gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
+def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
     with torch.no_grad():
         imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                 nd_to_sample, ed_to_sample)
-        save_image(imgs_tensor,"./exps/{}/{}_{}_train.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(imgs_tensor,"./exps/{}/{}_{}_train_gen.png".format(exp_folder, batches_done,IUO_penalty), \
+                    nrow=12, normalize=False)
+        imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds, \
+                                                nd_to_sample, ed_to_sample)
+        save_image(imgs_tensor,"./exps/{}/{}_{}_train_real.png".format(exp_folder, batches_done,IUO_penalty), \
                     nrow=12, normalize=False)
     return
     
@@ -316,7 +320,7 @@ if __name__ == '__main__':
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                     print("checkpoints save done")
-                    visualizeBatch(gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,IUO_penalty)
+                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,IUO_penalty)
                     print("training data save done")
                     visualizeSingleBatch(fp_loader_test, opt)
                     print("images save done")
