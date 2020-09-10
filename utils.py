@@ -1142,6 +1142,7 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
 
     all_imgs = []
     shift = 0
+#one 3-elements graph contains (node graph,masks graph, bounding box graph) 
     for b in range(batch_size):
         inds_nd = np.where(nd_to_sample==b) #b ~ b_index
         inds_ed = np.where(ed_to_sample==b)
@@ -1187,12 +1188,12 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
         # # print(np.unique(all_rr))
         # # print(len(extracted_rooms))
         # # exit();
-        # # draw graph
+###########draw node graph
         graph_img = draw_graph(nds, eds, shift, im_size=im_size) # node graph
         shift += len(nds)
         all_imgs.append(graph_img)
         
-        # draw masks
+#############draw masks graph
         mask_img = np.ones((32, 32, 3)) * 255
         for rm in extracted_rooms:
             mk, _, nd = rm 
@@ -1207,7 +1208,7 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
         mask_img = Image.fromarray(mask_img.astype('uint8'))
         mask_img = mask_img.resize((im_size, im_size)) #缩放
         all_imgs.append(torch.FloatTensor(np.array(mask_img).transpose(2, 0, 1))/255.0)
-
+#######draw bounding box graph
         # draw boxes - filling
         comb_img = Image.fromarray(comb_img.astype('uint8'))
         dr = ImageDraw.Draw(comb_img)
@@ -1229,5 +1230,6 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
         all_imgs.append(torch.FloatTensor(np.array(comb_img).\
                                      astype('float').\
                                      transpose(2, 0, 1))/255.0)
+#####################
     all_imgs = torch.stack(all_imgs)
     return all_imgs
