@@ -421,7 +421,7 @@ def open_png(im_path, im_size=512):
   if len(png.split()) < 4: #兼容gcloud
     idx = 2
   im.paste(png, mask=png.split()[idx])
-  w, h = im.size;print(png.split())
+  w, h = im.size;
 
     # pad graph images
   a = h/w
@@ -457,7 +457,7 @@ def draw_graph(nds, eds, shift, im_size=128):
     for i, p, j in eds:
         if p > 0:
             graph.add_edge(i-shift, j-shift, color='black', penwidth='4')
-    
+
     graph.node_attr['style']='filled'
     graph.layout(prog='dot')
     graph.draw('temp/_temp_{}.png'.format(EXP_ID))
@@ -1087,7 +1087,7 @@ def iou(a, b):
     area_iou = iou_w * iou_h
 	# get overlap ratio between IoU and all area
     iou = abs(area_iou / (area_a + area_b - area_iou))
-    print(area_a,area_b,area_iou,iou)
+    #print(area_a,area_b,area_iou,iou)
     return iou
 
 class BBox:
@@ -1188,7 +1188,7 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
         # # print(len(extracted_rooms))
         # # exit();
         # # draw graph
-        graph_img = draw_graph(nds, eds, shift, im_size=im_size)
+        graph_img = draw_graph(nds, eds, shift, im_size=im_size) # node graph
         shift += len(nds)
         all_imgs.append(graph_img)
         
@@ -1205,9 +1205,9 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
             r, g, b = webcolors.name_to_rgb(color)
             mask_img[inds[0, :], inds[1, :], :] = [r, g, b]
         mask_img = Image.fromarray(mask_img.astype('uint8'))
-        mask_img = mask_img.resize((im_size, im_size))
+        mask_img = mask_img.resize((im_size, im_size)) #缩放
         all_imgs.append(torch.FloatTensor(np.array(mask_img).transpose(2, 0, 1))/255.0)
-            
+
         # draw boxes - filling
         comb_img = Image.fromarray(comb_img.astype('uint8'))
         dr = ImageDraw.Draw(comb_img)

@@ -46,7 +46,7 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size
 
     iou_list = []
     for b in range(batch_size):
-        inds_nd = np.where(nd_to_sample==b) #b ~ b_index
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
         inds_ed = np.where(ed_to_sample==b)
         
         mks = maps_batch[inds_nd]

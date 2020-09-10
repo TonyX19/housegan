@@ -17,13 +17,13 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty
+from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty,compute_IOU_penalty
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
 parser.add_argument("--optim", type=str, default='adam', help="adam: learning rate")
 parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
 parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
@@ -126,7 +126,7 @@ def data_parallel(module, _input, indices):
 # discriminator.apply(weights_init_normal)
 
 # Visualize a single batch
-def visualizeSingleBatch(fp_loader_test, opt,IUO_penalty=None):
+def visualizeSingleBatch(fp_loader_test, opt):
     with torch.no_grad():
         # Unpack batch
         mks, nds, eds, nd_to_sample, ed_to_sample = next(iter(fp_loader_test))
@@ -144,7 +144,7 @@ def visualizeSingleBatch(fp_loader_test, opt,IUO_penalty=None):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-
+        IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample)
         # Save images
         save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,IUO_penalty), \
                    nrow=12, normalize=False)
@@ -153,6 +153,14 @@ def visualizeSingleBatch(fp_loader_test, opt,IUO_penalty=None):
     return
 
 
+def visualizeBatch(gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
+    with torch.no_grad():
+        imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
+                                                nd_to_sample, ed_to_sample)
+        save_image(imgs_tensor,"./exps/{}/{}_{}_train.png".format(exp_folder, batches_done,IUO_penalty), \
+                    nrow=12, normalize=False)
+    return
+    
 if __name__ == '__main__':
     # Configure data loader
     rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/' # replace with your dataset path need abs path
@@ -308,7 +316,10 @@ if __name__ == '__main__':
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                     print("checkpoints save done")
-                    visualizeSingleBatch(fp_loader_test, opt,IUO_penalty)
+                    visualizeBatch(gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,IUO_penalty)
+                    print("training data save done")
+                    visualizeSingleBatch(fp_loader_test, opt)
+                    print("images save done")
 
                 batches_done += opt.n_critic
                 
