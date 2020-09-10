@@ -72,8 +72,6 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
         extracted_room_stats[stats_key] = [extracted_rooms]
         
         extracted_rooms_len = len(extracted_rooms)    
-        if extracted_rooms_len == 0 :
-            print(extracted_rooms_len)    
         for i in range(extracted_rooms_len):
             room = extracted_rooms[i]
             mk, axes, nd = room
