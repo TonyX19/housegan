@@ -19,6 +19,8 @@ from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb
 import torch.nn.utils.spectral_norm as spectral_norm
 import logging
+import json
+import pickle
 
 
 def add_pool(x, nd_to_sample):
@@ -37,14 +39,15 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
-def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size=256):
-    IOU_penalty = 0;
+def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',serial='1',im_size=256):
+    IOU_penalty = [];
     maps_batch = x_fake.detach().cpu().numpy()
     nodes_batch = given_y.detach().cpu().numpy()
     edges_batch = given_w.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
 
     iou_list = []
+    extracted_room_stats = {}
     for b in range(batch_size):
         inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
         inds_ed = np.where(ed_to_sample==b)
@@ -55,7 +58,6 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size
         
         comb_img = np.ones((im_size, im_size, 3)) * 255
         extracted_rooms = []
-        extracted_room_stats = []
         for mk, nd in zip(mks, nds):
             r =  im_size/mk.shape[-1]
             x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
@@ -63,10 +65,12 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size
             w = y1-y0
             # if ed_to_sample is None:
             #     print(h,w)
-            extracted_room_stats.append((x0, y0, x1, y1))
+
             if h > 0 and w > 0:
                 extracted_rooms.append([mk, (x0, y0, x1, y1), nd])
-
+        stats_key = tag +'_'+ str(b)
+        extracted_room_stats[stats_key] = [extracted_rooms]
+        
         extracted_rooms_len = len(extracted_rooms)    
         if extracted_rooms_len == 0 :
             print(extracted_rooms_len)    
@@ -78,15 +82,21 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size
                 room_cmp = extracted_rooms[j]
                 mk_c,axes_c, nd_c = room_cmp
                 if not (nd_c == nd).all() :
-                    a = BBox(axes)
-                    b = BBox(axes_c)
-                    iou_v = BBox.iou(a,b)
+                    a_box = BBox(axes)
+                    b_box = BBox(axes_c)
+                    iou_v = BBox.iou(a_box,b_box)
                     iou_list.append(iou_v)
-        
-        print(extracted_room_stats)
+
+        extracted_room_stats[stats_key].append(iou_list)
+        # with open('./tracking/train_area_stats.txt', 'w') as outfile:
+        #     json.dump(extracted_room_stats, outfile)     
+        # with open('./tracking/train_area_stats_pi.txt', 'w') as fw:
+        #     pickle.dump(extracted_room_stats, fw) 
+
         if len(iou_list) == 0 :
-            return 1.5;
-        IOU_penalty = iuo_avg = np.mean(iou_list)
+            iuo_avg =  1.5;
+            continue;
+        iuo_avg = np.mean(iou_list)
                 # print(BBox.iou(a,b))
                 # print("-----------------")
                 #print("iou ",iou_2(np.array(axes),np.array(axes_c)))
@@ -100,17 +110,20 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,im_size
         # print(len(extracted_rooms))
         # exit();
         # draw graph
-
-    return IOU_penalty
+    IOU_penalty.append(iuo_avg)
+    IOU_penalty_avg = np.mean(IOU_penalty)
+    np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
+    return IOU_penalty_avg
 
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
-                             data_parallel=None):
+                             serial='1',data_parallel=None):
     gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
                              nd_to_sample, ed_to_sample, \
                              data_parallel)
-    IOU_penalty = compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample)
-    return (gradient_penalty,IOU_penalty)
+    fake_IOU_penalty = compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake',serial)
+    real_IOU_penalty = compute_IOU_penalty(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
+    return (gradient_penalty,fake_IOU_penalty,real_IOU_penalty)
 
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \

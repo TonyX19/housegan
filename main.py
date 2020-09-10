@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
 from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty,compute_IOU_penalty
 import os
+from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 parser = argparse.ArgumentParser()
@@ -144,13 +145,13 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-        IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample)
+        IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
         # Save images
         save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,IUO_penalty), \
                    nrow=12, normalize=False)
         save_image(fake_imgs_tensor, "./exps/{}/{}_{}_fake.png".format(exp_folder, batches_done,IUO_penalty), \
                    nrow=12, normalize=False)
-    return
+    return IUO_penalty
 
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
@@ -267,15 +268,15 @@ if __name__ == '__main__':
         
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                gradient_penalty,IUO_penalty = compute_penalty(discriminator, real_mks.data, \
+                gradient_penalty,IUO_penalty,real_IUO = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data,\
-                                                             ed_to_sample.data,data_parallel)
+                                                             ed_to_sample.data,str(batches_done),data_parallel)
             else:
-                gradient_penalty,IUO_penalty = compute_penalty(discriminator, real_mks.data, \
+                gradient_penalty,IUO_penalty,real_IUO = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            ed_to_sample.data,None)
+                                                            ed_to_sample.data,str(batches_done),None)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
                     + lambda_gp * gradient_penalty
 
@@ -313,8 +314,8 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [grad_p:%f] [IUO_p:%f]"
-                    % (epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),gradient_penalty,IUO_penalty))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [grad_p:%f] [IUO_p:%f] [Real_IUO:%f]"
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),gradient_penalty,IUO_penalty,real_IUO))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
@@ -322,8 +323,8 @@ if __name__ == '__main__':
                     print("checkpoints save done")
                     visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,IUO_penalty)
                     print("training data save done")
-                    visualizeSingleBatch(fp_loader_test, opt)
-                    print("images save done")
+                    vaild_IUO = visualizeSingleBatch(fp_loader_test, opt)
+                    print("images save done [valid IUO:%f]" % (vaild_IUO))
 
                 batches_done += opt.n_critic
                 
