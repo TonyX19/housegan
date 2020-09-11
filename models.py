@@ -74,11 +74,11 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
         extracted_rooms_len = len(extracted_rooms)    
         for i in range(extracted_rooms_len):
             room = extracted_rooms[i]
-            mk, axes, nd = room
+            mk, axes, nd,ed = room
             j = i+1
             for j in range(j,extracted_rooms_len):
                 room_cmp = extracted_rooms[j]
-                mk_c,axes_c, nd_c = room_cmp
+                mk_c,axes_c, nd_c,ed_c = room_cmp
                 if not (nd_c == nd).all() :
                     a_box = BBox(axes)
                     b_box = BBox(axes_c)
