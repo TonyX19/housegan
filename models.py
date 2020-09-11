@@ -67,7 +67,7 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
             #     print(h,w)
 
             if h > 0 and w > 0:
-                extracted_rooms.append([mk, (x0, y0, x1, y1), nd])
+                extracted_rooms.append([mk, (x0, y0, x1, y1), nd,eds])
         stats_key = tag +'_'+ str(b)
         extracted_room_stats[stats_key] = [extracted_rooms]
         
