@@ -46,9 +46,9 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
     edges_batch = given_w.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
 
-    iou_list = []
     extracted_room_stats = {}
     for b in range(batch_size):
+        iou_list = []
         inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
         inds_ed = np.where(ed_to_sample==b)
         
