@@ -247,6 +247,7 @@ class Generator(nn.Module): ## extend nn.Module
         logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
         x = x.view(-1, 16, self.init_size, self.init_size)
         logging.debug("gen x.shape %s " % (str(x.shape)))
+        logging.debug("gen given_w %s " % (str(given_w)))
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
         logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.upsample_1(x)
@@ -285,6 +286,7 @@ class Discriminator(nn.Module):
         x = x.view(-1, 1, 32, 32)
         logging.debug('dis x shape: %s' % (str(x.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
+        logging.debug('given_w.shape: %s' % (str(given_w)))
         # include nodes
         if True:
             y = self.l1(given_y)

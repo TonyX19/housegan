@@ -238,6 +238,7 @@ if __name__ == '__main__':
             logging.debug("z.shape %s" % (str(z_shape)))
             z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
             logging.debug("z.shape after N %s" % (str(z.shape)))
+            logging.debug("given_eds after N %s" % (str(given_eds)))
             if multi_gpu:
                 gen_mks = data_parallel(generator, (z, given_nds, given_eds), indices)
             else:
