@@ -3,7 +3,7 @@ import os
 import numpy as np
 import math
 
-from floorplan_dataset_maps import FloorplanGraphDataset, floorplan_collate_fn
+from floorplan_dataset_maps import FloorplanGraphDataset, floorplan_collate_fn_iou
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
 
@@ -36,7 +36,7 @@ parser.add_argument("--img_size", type=int, default=32, help="size of each image
 parser.add_argument("--sample_interval", type=int, default=1000, help="interval between image sampling")
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
-parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
+parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
@@ -169,19 +169,20 @@ def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sampl
 if __name__ == '__main__':
     # Configure data loader
     rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/' # replace with your dataset path need abs path
+    #rooms_path = '/home/tony_chen_x19/dataset/'
     fp_dataset_train = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set)
     fp_loader = torch.utils.data.DataLoader(fp_dataset_train, 
                                             batch_size=opt.batch_size, 
                                             shuffle=True,
                                             num_workers=opt.n_cpu,
-                                            collate_fn=floorplan_collate_fn)
+                                            collate_fn=floorplan_collate_fn_iou)
 
     fp_dataset_test = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set, split='eval')
     fp_loader_test = torch.utils.data.DataLoader(fp_dataset_test, 
                                             batch_size=64, 
                                             shuffle=False,
                                             num_workers=opt.n_cpu,
-                                            collate_fn=floorplan_collate_fn)
+                                            collate_fn=floorplan_collate_fn_iou)
 
     # Optimizers
     if opt.optim == 'adam' :

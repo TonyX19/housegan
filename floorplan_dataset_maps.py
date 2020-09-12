@@ -29,7 +29,8 @@ import glob
 from PIL import Image, ImageDraw, ImageOps
 import matplotlib.pyplot as plt
 import random
-from utils import mask_to_bb, ROOM_CLASS 
+from utils import mask_to_bb, ROOM_CLASS,GIOU
+import torch.nn as nn
 sets = {'A':[1, 3], 'B':[4, 6], 'C':[7, 9], 'D':[10, 12], 'E':[13, 100]}
 
 def filter_graphs(graphs, min_h=0.03, min_w=0.03):
@@ -72,6 +73,9 @@ class FloorplanGraphDataset(Dataset):
 		elif split == 'eval':
 			self.subgraphs = np.load('{}/train_data.npy'.format(self.shapes_path), allow_pickle=True)
 			self.augment = False
+		elif split == 'all':
+			self.subgraphs = np.load('{}/all_data.npy'.format(self.shapes_path), allow_pickle=True)
+			self.augment = False
 		else:
 			print('Error split not supported')        
 			exit(1)
@@ -91,6 +95,8 @@ class FloorplanGraphDataset(Dataset):
 			if (split == 'train') and (in_set == False):
 				filtered_subgraphs.append(g)
 			elif (split == 'eval') and (in_set == True):
+				filtered_subgraphs.append(g)
+			elif (split == 'all') and (in_set == False):
 				filtered_subgraphs.append(g)
 		print("filted set:%s" % len(filtered_subgraphs))		
 		self.subgraphs = filtered_subgraphs
@@ -287,3 +293,142 @@ def floorplan_collate_fn(batch):
 	all_edge_to_sample = torch.cat(all_edge_to_sample)
 	return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edge_to_sample
 
+def transfer_edges(rooms_mks,nodes,edges,im_size=256):
+	edges = edges.to(torch.float32)
+	room_axes = {}
+	for i,mk in enumerate(rooms_mks):
+		room_type = np.where(nodes[i] == 1)[0][0]
+		r =  im_size/mk.shape[-1]
+		room_axes[room_type] = np.array(mask_to_bb(mk)) * r 
+
+
+	for i,ed in enumerate(edges):
+		if (int(ed[0]) in room_axes.keys()) and (int(ed[2]) in room_axes.keys()):
+			box1 = room_axes[int(ed[0])]
+			box2 = room_axes[int(ed[2])]
+			iou,Giou = GIOU(np.array([box1]),np.array([box2]))
+			edges[i][1] = torch.tensor(Giou[0],dtype=torch.float32)[0]
+
+	return edges
+
+def floorplan_collate_fn_iou(batch):
+	all_rooms_mks, all_nodes, all_edges = [], [], []
+	all_node_to_sample, all_edge_to_sample = [], []
+	node_offset = 0
+
+	for i, (rooms_mks, nodes, edges) in enumerate(batch):		
+		O, T = nodes.size(0), edges.size(0)
+		all_rooms_mks.append(rooms_mks)
+		all_nodes.append(nodes)
+		edges = edges.clone()
+		
+		if len(edges) > 0 :
+			edges = transfer_edges(rooms_mks, nodes, edges)
+		
+		if edges.shape[0] > 0:
+			edges[:, 0] += node_offset
+			edges[:, 2] += node_offset
+			all_edges.append(edges)
+		all_node_to_sample.append(torch.LongTensor(O).fill_(i))
+		all_edge_to_sample.append(torch.LongTensor(T).fill_(i))
+		node_offset += O
+	# exit();
+	all_rooms_mks = torch.cat(all_rooms_mks, 0)
+	all_nodes = torch.cat(all_nodes)
+	if len(all_edges) > 0:
+		all_edges = torch.cat(all_edges)
+	else:
+		all_edges = torch.tensor([])       
+	all_node_to_sample = torch.cat(all_node_to_sample)
+	all_edge_to_sample = torch.cat(all_edge_to_sample)
+	return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edge_to_sample
+
+##########change shape not well
+def floorplan_collate_fn_t(batch):
+	all_rooms_mks, all_nodes, all_edges = [], [], []
+	all_node_to_sample, all_edge_to_sample = [], []
+	node_offset = 0
+
+	for i, (rooms_mks, nodes, edges) in enumerate(batch):	
+		#print(rooms_mks.shape,nodes.shape,edges.shape)
+		#torch.Size([8, 32, 32]) torch.Size([8, 10]) torch.Size([28, 3])
+		# print(rooms_mks.shape,rooms_mks.shape[0],rooms_mks.shape[1],rooms_mks.shape[2])
+		# print(nodes.shape,nodes.shape[0],nodes.shape[1])
+		O, T = nodes.size(0), edges.size(0)
+		rooms_mks = rooms_mks.reshape(1,rooms_mks.shape[0],rooms_mks.shape[1],rooms_mks.shape[2])
+		nodes = nodes.reshape(1,nodes.shape[0],nodes.shape[1])
+		if i == 0:
+			all_rooms_mks = rooms_mks
+			all_nodes = nodes
+		else:
+			########### room_mks
+			#print(all_rooms_mks.shape)
+			if rooms_mks.shape[1] > all_rooms_mks.shape[1] :
+				padding_num = rooms_mks.shape[1]-all_rooms_mks.shape[1]
+				z_padding = torch.zeros((all_rooms_mks.shape[0],padding_num,rooms_mks.shape[2],rooms_mks.shape[3]))
+				all_rooms_mks = torch.cat([all_rooms_mks,z_padding],1)
+				#print("all",all_rooms_mks.shape)
+			elif rooms_mks.shape[1] < all_rooms_mks.shape[1]:
+				padding_num = all_rooms_mks.shape[1]-rooms_mks.shape[1]
+				z_padding = torch.zeros((1,padding_num,rooms_mks.shape[2],rooms_mks.shape[3]))
+				rooms_mks = torch.cat([rooms_mks,z_padding],1)
+				#print("si:",rooms_mks.shape)
+
+			all_rooms_mks = torch.cat([all_rooms_mks,rooms_mks], 0) 
+			###############nodes
+			if(nodes.shape[1] > all_nodes.shape[1]):
+				padding_num = nodes.shape[1]-all_nodes.shape[1]
+				z_padding = torch.zeros((all_nodes.shape[0],padding_num,all_nodes.shape[2]))
+				all_nodes = torch.cat([all_nodes,z_padding],1)
+				#print('all',all_nodes.shape)
+			elif nodes.shape[1] < all_nodes.shape[1]:
+				padding_num = all_nodes.shape[1]-nodes.shape[1]
+				z_padding = torch.zeros((1,padding_num,nodes.shape[2]))
+				nodes = torch.cat([nodes,z_padding],1)
+				#print('sig:',nodes.shape)
+
+			all_nodes = torch.cat([all_nodes,nodes],0)
+			##################
+	
+		edges = edges.clone()
+		if edges.shape[0] > 0:
+			edges[:, 0] += node_offset
+			edges[:, 2] += node_offset
+			all_edges.append(edges)
+		else:
+			all_edges.append(torch.zeros((1,3)))
+
+		all_node_to_sample.append(torch.LongTensor(O).fill_(i))
+		all_edge_to_sample.append(torch.LongTensor(T).fill_(i))
+		node_offset += O
+	# print(all_nodes.shape,all_rooms_mks.shape)
+	# exit();
+	####flatten#########
+	# all_rooms_mks = torch.cat(all_rooms_mks, 0) 
+	# all_nodes = torch.cat(all_nodes)
+	print(len(all_edges))
+	if len(all_edges) > 0:
+		all_edges_tmp = all_edges[0]
+		for i,edge in enumerate(all_edges):
+			edge = edge.reshape(1,edge.shape[0],edge.shape[1])
+			if i == 0:
+				all_edges_tmp = edge
+				continue
+			if(edge.shape[1] > all_edges_tmp.shape[1]):
+				padding_num = edge.shape[1]-all_edges_tmp.shape[1]
+				z_padding = torch.zeros((all_edges_tmp.shape[0],padding_num,all_edges_tmp.shape[2]))
+				all_edges_tmp = torch.cat([all_edges_tmp,z_padding],1)
+				#print('all',all_nodes.shape)
+			elif edge.shape[1] < all_edges_tmp.shape[1]:
+				padding_num = all_edges_tmp.shape[1]-edge.shape[1]
+				z_padding = torch.zeros((1,padding_num,edge.shape[2]))
+				edge = torch.cat([edge,z_padding],1)
+			all_edges_tmp = torch.cat([all_edges_tmp,edge],0)
+		all_edges = all_edges_tmp
+	else:
+		all_edges = torch.tensor([])   
+	####flatten#########
+	all_node_to_sample = torch.cat(all_node_to_sample)
+	all_edge_to_sample = torch.cat(all_edge_to_sample)
+
+	return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edge_to_sample

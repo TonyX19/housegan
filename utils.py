@@ -1062,34 +1062,6 @@ def combine_images_bbs(bbs_batch, im_size=256):
     return all_imgs
 
 import webcolors
-def iou(a, b):
-  # [x1, y1, x2, y2]
-	# get area of a
-    area_a = (a[2] - a[0]) * (a[3] - a[1])
-	# get area of b
-    area_b = (b[2] - b[0]) * (b[3] - b[1])
-
-	# get left top x of IoU
-    iou_x1 = np.maximum(a[0], b[0])
-	# get left top y of IoU
-    iou_y1 = np.maximum(a[1], b[1])
-	# get right bottom of IoU
-    iou_x2 = np.minimum(a[2], b[2])
-	# get right bottom of IoU
-    iou_y2 = np.minimum(a[3], b[3])
-
-	# get width of IoU
-    iou_w = iou_x2 - iou_x1
-	# get height of IoU
-    iou_h = iou_y2 - iou_y1
-
-	# get area of IoU
-    area_iou = iou_w * iou_h
-	# get overlap ratio between IoU and all area
-    iou = abs(area_iou / (area_a + area_b - area_iou))
-    #print(area_a,area_b,area_iou,iou)
-    return iou
-
 class BBox:
     def __init__(self,axes):
         x,y,x1,y1 = axes
@@ -1119,7 +1091,56 @@ class BBox:
         area_c = w * h
         #print(area_a,area_b,area_c)
         return area_c / (area_a + area_b - area_c)
+def GIOU (boxes1 , boxes2 ):
+    "calculate GIOU  "
+    '''
+    boxes1 shape : shape (n, 4)
+    [extracted_rooms[6][1]]
+    boxes2 shape : shape (k, 4)
+    [extracted_rooms[5][1]]
+    gious: shape (n, k)       
+    '''
+    IOU = []
+    GIOU = []
+    num = (boxes1[:,0]).size
+    x1 = boxes1[:,0]
+    y1 = boxes1[:,1]
+    x2 = boxes1[:,2]
+    y2 = boxes1[:,3]
 
+    xx1=boxes2[:,0]
+    yy1=boxes2[:,1]
+    xx2=boxes2[:,2]
+    yy2=boxes2[:,3]
+
+    area1 = (x2 -x1) * (y2 -y1)  #求取框的面积
+    area2 = (xx2-xx1) * (yy2- yy1)
+    for i in range (num):
+        inter_max_x = np.minimum(x2[i], xx2[:])   #求取重合的坐标及面积
+        inter_max_y = np.minimum(y2[i], yy2[:])
+        inter_min_x = np.maximum(x1[i], xx1[:])
+        inter_min_y = np.maximum(y1[i], yy1[:])
+        inter_w = np.maximum(0 ,inter_max_x-inter_min_x)
+        inter_h = np.maximum(0 ,inter_max_y-inter_min_y)
+
+        inter_areas = inter_w * inter_h
+       #print(inter_w , inter_h)
+        out_max_x = np.maximum(x2[i], xx2[:])  #求取包裹两个框的集合C的坐标及面积
+        out_max_y = np.maximum(y2[i], yy2[:])
+        out_min_x = np.minimum(x1[i], xx1[:])
+        out_min_y = np.minimum(y1[i], yy1[:])
+        out_w = np.maximum(0, out_max_x - out_min_x)
+        out_h = np.maximum(0, out_max_y - out_min_y)
+
+        outer_areas = out_w * out_h
+        union = area1[i] + area2[:] - inter_areas  #两框的总面积   利用广播机制
+        ious = inter_areas / union
+        gious = ious - (outer_areas - union)/outer_areas # IOU - ((C\union）/C)
+        # print("ious :",ious)
+        # print("gious" ,gious)
+        IOU.append(ious)
+        GIOU.append(gious)
+    return IOU , GIOU
 
 def iou_2(box1,box2):
       assert box1.size == 4 and box2.size == 4,"bounding box coordinate size must be 4"
