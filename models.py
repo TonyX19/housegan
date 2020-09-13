@@ -292,6 +292,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x, given_y=None, given_w=None, nd_to_sample=None,given_areas=None):
         logging.debug('dis x shape: %s' % (str(x.shape)))
+        dtype, device = x.dtype, x.device
         x = x.view(-1, 1, 32, 32)
         given_w = given_w[:,0:3]
         logging.debug('dis x shape: %s' % (str(x.shape)))
