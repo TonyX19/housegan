@@ -138,7 +138,7 @@ def visualizeSingleBatch(fp_loader_test, opt):
         # Generate a batch of images
         z_shape = [real_mks.shape[0], opt.latent_dim]
         z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
-        gen_mks = generator(z, given_nds, given_eds)
+        gen_mks = generator(z, given_nds, given_eds,mks_areas)
             
         # Generate image tensors
         real_imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds, \
