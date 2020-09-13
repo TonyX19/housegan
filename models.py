@@ -103,6 +103,9 @@ def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
     real_iou_list = compute_IOU_penalty_norm(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
     iou_diff = real_iou_list - fake_iou_list
 
+    if len(iou_diff) == 0:
+        return (gradient_penalty,0,1)
+
     iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
     giou_norm = np.linalg.norm(iou_diff[:,1], ord=1)  
 

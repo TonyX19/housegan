@@ -149,8 +149,12 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         vaild_iou_list = compute_IOU_penalty_norm(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
        
-        iou_norm = np.linalg.norm(vaild_iou_list[:,0], ord=1)  
-        giou_norm = np.linalg.norm(vaild_iou_list[:,1], ord=1)  
+        if len(vaild_iou_list) == 0:
+            iou_norm = 0
+            giou_norm = 1 #np.linalg.norm([-1]) = 1
+        else:
+            iou_norm = np.linalg.norm(vaild_iou_list[:,0], ord=1)  
+            giou_norm = np.linalg.norm(vaild_iou_list[:,1], ord=1)  
         # Save images
 
         save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,giou_norm), \
