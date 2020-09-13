@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty,compute_IOU_penalty
+from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty,compute_IOU_penalty_norm
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -145,24 +145,28 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-        IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
+        vaild_iou_list = compute_IOU_penalty_norm(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
+       
+        iou_norm = np.linalg.norm(vaild_iou_list[:,0], ord=1)  
+        giou_norm = np.linalg.norm(vaild_iou_list[:,1], ord=1)  
         # Save images
-        save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,IUO_penalty), \
+
+        save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,giou_norm), \
                    nrow=12, normalize=False)
-        save_image(fake_imgs_tensor, "./exps/{}/{}_{}_fake.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(fake_imgs_tensor, "./exps/{}/{}_{}_fake.png".format(exp_folder, batches_done,giou_norm), \
                    nrow=12, normalize=False)
     return IUO_penalty
 
 
-def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
+def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,Giou_p):
     with torch.no_grad():
         imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                 nd_to_sample, ed_to_sample)
-        save_image(imgs_tensor,"./exps/{}/{}_{}_train_gen.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(imgs_tensor,"./exps/{}/{}_{}_train_gen.png".format(exp_folder, batches_done,Giou_p), \
                     nrow=12, normalize=False)
         imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds, \
                                                 nd_to_sample, ed_to_sample)
-        save_image(imgs_tensor,"./exps/{}/{}_{}_train_real.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(imgs_tensor,"./exps/{}/{}_{}_train_real.png".format(exp_folder, batches_done,Giou_p), \
                     nrow=12, normalize=False)
     return
     
@@ -322,7 +326,7 @@ if __name__ == '__main__':
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                     print("checkpoints save done")
-                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,IUO_penalty)
+                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,Giou_p)
                     print("training data save done")
                     vaild_IUO = visualizeSingleBatch(fp_loader_test, opt)
                     print("images save done [valid IUO:%f]" % (vaild_IUO))
