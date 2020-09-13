@@ -39,87 +39,13 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
-def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',serial='1',im_size=256):
-    IOU_penalty = [];
-    maps_batch = x_fake.detach().cpu().numpy()
-    nodes_batch = given_y.detach().cpu().numpy()
-    edges_batch = given_w.detach().cpu().numpy()
-    batch_size = torch.max(nd_to_sample) + 1
-
-    extracted_room_stats = {}
-    for b in range(batch_size):
-        iou_list = []
-        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
-        inds_ed = np.where(ed_to_sample==b)
-        
-        mks = maps_batch[inds_nd]
-        nds = nodes_batch[inds_nd]
-        eds = edges_batch[inds_ed]
-        
-        comb_img = np.ones((im_size, im_size, 3)) * 255
-        extracted_rooms = []
-        for mk, nd in zip(mks, nds):
-            r =  im_size/mk.shape[-1]
-            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
-            h = x1-x0
-            w = y1-y0
-            # if ed_to_sample is None:
-            #     print(h,w)
-
-            if h > 0 and w > 0:
-                extracted_rooms.append([mk, (x0, y0, x1, y1), nd,eds])
-        stats_key = tag +'_'+ str(b)
-        extracted_room_stats[stats_key] = [extracted_rooms]
-        
-        extracted_rooms_len = len(extracted_rooms)    
-        for i in range(extracted_rooms_len):
-            room = extracted_rooms[i]
-            mk, axes, nd,ed = room
-            j = i+1
-            for j in range(j,extracted_rooms_len):
-                room_cmp = extracted_rooms[j]
-                mk_c,axes_c, nd_c,ed_c = room_cmp
-                if not (nd_c == nd).all() :
-                    a_box = BBox(axes)
-                    b_box = BBox(axes_c)
-                    iou_v = BBox.iou(a_box,b_box)
-                    iou_list.append(iou_v)
-
-        extracted_room_stats[stats_key].append(iou_list)
-        # with open('./tracking/train_area_stats.txt', 'w') as outfile:
-        #     json.dump(extracted_room_stats, outfile)     
-        # with open('./tracking/train_area_stats_pi.txt', 'w') as fw:
-        #     pickle.dump(extracted_room_stats, fw) 
-
-        if len(iou_list) == 0 :
-            iuo_avg =  1.5;
-            continue;
-        iuo_avg = np.mean(iou_list)
-                # print(BBox.iou(a,b))
-                # print("-----------------")
-                #print("iou ",iou_2(np.array(axes),np.array(axes_c)))
-                #print(iou(axes,axes_c))
-                #print(nd_c,nd)
-        # print(iou_list)
-        # a = np.where(eds[:,1]>0)
-        # rel = np.array(eds[a])
-        # all_rr = np.concatenate((rel[:,0],rel[:,2]),0)
-        # print(np.unique(all_rr))
-        # print(len(extracted_rooms))
-        # exit();
-        # draw graph
-    IOU_penalty.append(iuo_avg)
-    IOU_penalty_avg = np.mean(IOU_penalty)
-    np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
-    return IOU_penalty_avg
-
 def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',serial='1',im_size=256):
     IOU_penalty = [];
     maps_batch = x_fake.detach().cpu().numpy()
     nodes_batch = given_y.detach().cpu().numpy()
     edges_batch = given_w.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
-    np.seterr(divide='ignore',invalid='ignore')
+    np.seterr(divide='ignore',invalid='ignore') ### ignore nan
     extracted_room_stats = {}
     for b in range(batch_size):
         iou_list = []
@@ -153,6 +79,10 @@ def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,ta
                 a_box = list(axes)
                 b_box = list(axes_c)
                 iou,Giou = GIOU(np.array([a_box]),np.array([b_box]))
+                if np.isnan(iou[0][0]):
+                    iou[0][0] = 0
+                if np.isnan(Giou[0][0]):
+                    Giou[0][0] = -1
                 key = str(i)+'_'+str(j)
                 iou_dict[key] =  [iou[0][0],Giou[0][0]]
                 iou_list.append(iou_dict[key])
