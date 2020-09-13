@@ -130,7 +130,7 @@ def data_parallel(module, _input, indices):
 def visualizeSingleBatch(fp_loader_test, opt):
     with torch.no_grad():
         # Unpack batch
-        mks, nds, eds, nd_to_sample, ed_to_sample = next(iter(fp_loader_test))
+        mks, nds, eds, nd_to_sample, ed_to_sample,mks_areas = next(iter(fp_loader_test))
         real_mks = Variable(mks.type(Tensor))
         given_nds = Variable(nds.type(Tensor))
         given_eds = eds
