@@ -206,7 +206,7 @@ if __name__ == '__main__':
     for epoch in range(opt.n_epochs):
         for i, batch in enumerate(fp_loader):
             # Unpack batch
-            mks, nds, eds, nd_to_sample, ed_to_sample = batch
+            mks, nds, eds, nd_to_sample, ed_to_sample,mks_areas = batch
             logging.debug("mks: %s nds:%s nd_to_sample:%s" % (str(mks.shape),str(nds.shape),str(nd_to_sample.shape)))
             indices = nd_to_sample, ed_to_sample
             # Adversarial ground truths
@@ -240,18 +240,18 @@ if __name__ == '__main__':
             logging.debug("z.shape after N %s" % (str(z.shape)))
             logging.debug("given_eds after N %s" % (str(given_eds)))
             if multi_gpu:
-                gen_mks = data_parallel(generator, (z, given_nds, given_eds), indices)
+                gen_mks = data_parallel(generator, (z, given_nds, given_eds,mks_areas), indices)
             else:
-                gen_mks = generator(z, given_nds, given_eds)
+                gen_mks = generator(z,given_nds, given_eds,mks_areas)
             
             # Real images
             if multi_gpu:
                 real_validity = data_parallel(discriminator, \
                                             (real_mks, given_nds, \
-                                            given_eds, nd_to_sample), \
+                                            given_eds, nd_to_sample,mks_areas), \
                                             indices)
             else:
-                real_validity = discriminator(real_mks, given_nds, given_eds, nd_to_sample)
+                real_validity = discriminator(real_mks, given_nds, given_eds, nd_to_sample,mks_areas)
             # y=A(x), z=B(y) 求B中参数的梯度，不求A中参数的梯度
             # # 第一种方法
             # y = A(v1)
@@ -262,23 +262,23 @@ if __name__ == '__main__':
             if multi_gpu:
                 fake_validity = data_parallel(discriminator, \
                                             (gen_mks.detach(), given_nds.detach(), \
-                                            given_eds.detach(), nd_to_sample.detach()),\
+                                            given_eds.detach(), nd_to_sample.detach(),mks_areas.detach()),\
                                             indices)
             else:
                 fake_validity = discriminator(gen_mks.detach(), given_nds.detach(), \
-                                            given_eds.detach(), nd_to_sample.detach())
+                                            given_eds.detach(), nd_to_sample.detach(),mks_areas.detach())
         
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
                 gradient_penalty,IUO_penalty,real_IUO = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data,\
-                                                             ed_to_sample.data,str(batches_done),data_parallel)
+                                                             ed_to_sample.data,mks_areas,str(batches_done),data_parallel)
             else:
                 gradient_penalty,IUO_penalty,real_IUO = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            ed_to_sample.data,str(batches_done),None)
+                                                            ed_to_sample.data,mks_areas,str(batches_done),None)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
                     + lambda_gp * gradient_penalty
 
@@ -306,10 +306,10 @@ if __name__ == '__main__':
                 if multi_gpu:
                     fake_validity = data_parallel(discriminator, \
                                                 (gen_mks, given_nds, \
-                                                given_eds, nd_to_sample), \
+                                                given_eds, nd_to_sample,mks_areas), \
                                                 indices)
                 else:
-                    fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
+                    fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample,mks_areas)
                     
                 # Update generator
                 g_loss = -torch.mean(fake_validity)

@@ -115,17 +115,17 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
 
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
-                             serial='1',data_parallel=None):
+                             given_areas,serial='1',data_parallel=None):
     gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
                              nd_to_sample, ed_to_sample, \
-                             data_parallel)
+                             given_areas,data_parallel)
     fake_IOU_penalty = compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake',serial)
     real_IOU_penalty = compute_IOU_penalty(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
     return (gradient_penalty,fake_IOU_penalty,real_IOU_penalty)
 
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
-                             data_parallel=None):
+                             given_areas=None,data_parallel=None):
     indices = nd_to_sample, ed_to_sample
     batch_size = torch.max(nd_to_sample) + 1
     dtype, device = x.dtype, x.device
@@ -138,9 +138,9 @@ def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
     x_both = Variable(x_both, requires_grad=True)
     grad_outputs = torch.ones(batch_size, 1).to(device)
     if data_parallel:
-        _output = data_parallel(D, (x_both, given_y, given_w, nd_to_sample), indices)
+        _output = data_parallel(D, (x_both, given_y, given_w, nd_to_sample,given_areas), indices)
     else:
-        _output = D(x_both, given_y, given_w, nd_to_sample)
+        _output = D(x_both, given_y, given_w, nd_to_sample,given_areas)
     grad = torch.autograd.grad(outputs=_output, inputs=x_both, grad_outputs=grad_outputs, \
                                retain_graph=True, create_graph=True, only_inputs=True)[0]
     gradient_penalty = ((grad.norm(2, 1).norm(2, 1) - 1) ** 2).mean()
@@ -214,7 +214,9 @@ class CMP(nn.Module):
         # update nodes features
         enc_in = torch.cat([feats, pooled_v_pos, pooled_v_neg], 1)
         logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
+        #logging.debug("enc_in:%s" % (str(enc_in)))
         out = self.encoder(enc_in)
+        #logging.debug("out.shape:%s" % (str(out)))
         return out
     
          
@@ -222,27 +224,30 @@ class Generator(nn.Module): ## extend nn.Module
     def __init__(self):
         super(Generator, self).__init__()
         self.init_size = 32 // 4
-        self.l1 = nn.Sequential(nn.Linear(138, 16 * self.init_size ** 2))
+        self.l1 = nn.Sequential(nn.Linear(139, 16 * self.init_size ** 2)) #138 +1 area
         self.upsample_1 = nn.Sequential(*conv_block(16, 16, 4, 2, 1, act="leaky", upsample=True))
         self.upsample_2 = nn.Sequential(*conv_block(16, 16, 4, 2, 1, act="leaky", upsample=True))
         self.cmp_1 = CMP(in_channels=16)
+        self.cmp_3 = CMP(in_channels=16)
         self.cmp_2 = CMP(in_channels=16)
         self.decoder = nn.Sequential(
             *conv_block(16, 256, 3, 1, 1, act="leaky"),
             *conv_block(256, 128, 3, 1, 1, act="leaky"),    
             *conv_block(128, 1, 3, 1, 1, act="tanh"))                                        
     
-    def forward(self, z, given_y=None, given_w=None):
+    def forward(self, z, given_y=None, given_w=None,given_areas=None):
         logging.debug('gen z shape: %s' % (str(z.shape)))
         z = z.view(-1, 128)
         logging.debug('gen z shape: %s' % (str(z.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
+        logging.debug('given_areas.shape: %s' % (str(given_areas.shape)))
         # include nodes
         if True:
             y = given_y.view(-1, 10)
-            z = torch.cat([z, y], 1)
+            a = given_areas.view(-1,1)
+            z = torch.cat([z,a, y], 1)
+        
         logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
-
         x = self.l1(z)    
         logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
         x = x.view(-1, 16, self.init_size, self.init_size)
@@ -263,10 +268,11 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.encoder = nn.Sequential(
-            *conv_block(9, 16, 3, 1, 1, act="leaky"),
+            *conv_block(10, 16, 3, 1, 1, act="leaky"), #9+1 areas
             *conv_block(16, 16, 3, 1, 1, act="leaky"),
             *conv_block(16, 16, 3, 1, 1, act="leaky"))
-        self.l1 = nn.Sequential(nn.Linear(10, 8 * 32 ** 2))
+        self.l1 = nn.Sequential(nn.Linear(in_features=10, out_features=8 * 32 ** 2))
+        self.la = nn.Sequential(nn.Linear(in_features=1, out_features=8 * 32 ** 2))
         self.cmp_1 = CMP(in_channels=16)
         self.downsample_1 = nn.Sequential(*conv_block(16, 16, 3, 2, 1, act="leaky"))
         self.cmp_2 = CMP(in_channels=16)
@@ -281,7 +287,7 @@ class Discriminator(nn.Module):
         self.fc_layer_global = nn.Sequential(nn.Linear(128, 1))
         self.fc_layer_local = nn.Sequential(nn.Linear(128, 1))
 
-    def forward(self, x, given_y=None, given_w=None, nd_to_sample=None):
+    def forward(self, x, given_y=None, given_w=None, nd_to_sample=None,given_areas=None):
         logging.debug('dis x shape: %s' % (str(x.shape)))
         x = x.view(-1, 1, 32, 32)
         logging.debug('dis x shape: %s' % (str(x.shape)))
@@ -291,7 +297,10 @@ class Discriminator(nn.Module):
         if True:
             y = self.l1(given_y)
             y = y.view(-1, 8, 32, 32)
-            x = torch.cat([x, y], 1)
+            a = self.la(given_areas)
+            a = given_areas.view(-1, 8, 32, 32)
+            x = torch.cat([x,y,a], 1)
+        
         x = self.encoder(x)
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])  
         x = self.downsample_1(x)

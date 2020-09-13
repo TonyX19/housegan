@@ -1141,6 +1141,11 @@ def GIOU (boxes1 , boxes2 ):
         IOU.append(ious)
         GIOU.append(gious)
     return IOU , GIOU
+def compute_area(box):
+      x1,y1,x2,y2 = box
+      area = (x2 -x1) * (y2 -y1)
+
+      return area
 
 def iou_2(box1,box2):
       assert box1.size == 4 and box2.size == 4,"bounding box coordinate size must be 4"

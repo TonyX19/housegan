@@ -29,7 +29,7 @@ import glob
 from PIL import Image, ImageDraw, ImageOps
 import matplotlib.pyplot as plt
 import random
-from utils import mask_to_bb, ROOM_CLASS,GIOU
+from utils import mask_to_bb, ROOM_CLASS,GIOU,compute_area
 import torch.nn as nn
 sets = {'A':[1, 3], 'B':[4, 6], 'C':[7, 9], 'D':[10, 12], 'E':[13, 100]}
 
@@ -311,9 +311,19 @@ def transfer_edges(rooms_mks,nodes,edges,im_size=256):
 
 	return edges
 
+def compute_mks_area(rooms_mks,im_size=256):
+	mks_areas = []
+	for i,mk in enumerate(rooms_mks):
+		r =  im_size/mk.shape[-1]
+		area = compute_area(np.array(mask_to_bb(mk)) * r )
+		mks_areas.append([area]) 
+
+	return torch.FloatTensor(mks_areas)
+
 def floorplan_collate_fn_iou(batch):
 	all_rooms_mks, all_nodes, all_edges = [], [], []
 	all_node_to_sample, all_edge_to_sample = [], []
+	all_rooms_areas = []
 	node_offset = 0
 
 	for i, (rooms_mks, nodes, edges) in enumerate(batch):		
@@ -321,7 +331,8 @@ def floorplan_collate_fn_iou(batch):
 		all_rooms_mks.append(rooms_mks)
 		all_nodes.append(nodes)
 		edges = edges.clone()
-		
+		all_rooms_areas.append(compute_mks_area(rooms_mks))
+
 		if len(edges) > 0 :
 			edges = transfer_edges(rooms_mks, nodes, edges)
 		
@@ -335,13 +346,15 @@ def floorplan_collate_fn_iou(batch):
 	# exit();
 	all_rooms_mks = torch.cat(all_rooms_mks, 0)
 	all_nodes = torch.cat(all_nodes)
+	all_rooms_areas = torch.cat(all_rooms_areas)
+
 	if len(all_edges) > 0:
 		all_edges = torch.cat(all_edges)
 	else:
 		all_edges = torch.tensor([])       
 	all_node_to_sample = torch.cat(all_node_to_sample)
 	all_edge_to_sample = torch.cat(all_edge_to_sample)
-	return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edge_to_sample
+	return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edge_to_sample,all_rooms_areas
 
 ##########change shape not well
 def floorplan_collate_fn_t(batch):
