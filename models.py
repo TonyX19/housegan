@@ -237,6 +237,7 @@ class Generator(nn.Module): ## extend nn.Module
     
     def forward(self, z, given_y=None, given_w=None,given_areas=None):
         logging.debug('gen z shape: %s' % (str(z.shape)))
+        dtype, device = z.dtype, z.device
         z = z.view(-1, 128)
         given_w = given_w[:,0:3]
 
@@ -246,7 +247,7 @@ class Generator(nn.Module): ## extend nn.Module
         # include nodes
         if True:
             y = given_y.view(-1, 10)
-            a = given_areas.view(-1,1)
+            a = given_areas.to(device=device).view(-1,1)
             z = torch.cat([z, y, a], 1)
         
         logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
@@ -300,7 +301,7 @@ class Discriminator(nn.Module):
         if True:
             y = self.l1(given_y)
             y = y.view(-1, 8, 32, 32)
-            a = self.la(given_areas)
+            a = self.la(given_areas.to(device=device))
             a = a.view(-1, 8, 32, 32)
             x = torch.cat([x,y,a], 1)
         
