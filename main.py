@@ -60,7 +60,9 @@ multi_gpu = False
 #                                                                         opt.latent_dim, opt.b1, opt.b2)
 exp_folder = "{}_{}".format(opt.exp_folder, opt.target_set)
 os.makedirs("./exps/"+exp_folder, exist_ok=True)
-
+os.makedirs("./temps/", exist_ok=True)
+os.makedirs("./tracking/", exist_ok=True)
+os.makedirs("./checkpoints/", exist_ok=True)
 # Loss function
 adversarial_loss = torch.nn.BCEWithLogitsLoss()
 
