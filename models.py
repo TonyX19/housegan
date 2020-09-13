@@ -87,8 +87,8 @@ def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,ta
                 iou_dict[key] =  [iou[0][0],Giou[0][0]]
                 iou_list.append(iou_dict[key])
         extracted_room_stats[stats_key].append(iou_dict)
-
-    np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
+    
+    #np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
 
     return np.array(iou_list)
 
@@ -106,9 +106,15 @@ def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
     if len(iou_diff) == 0:
         return (gradient_penalty,0,1)
 
+    real_iou_norm = np.linalg.norm(real_iou_list[:,0], ord=1) 
+    fake_iou_norm = np.linalg.norm(fake_iou_list[:,0], ord=1) 
+    real_Giou_norm = np.linalg.norm(real_iou_list[:,1], ord=1) 
+    fake_Giou_norm = np.linalg.norm(fake_iou_list[:,1], ord=1) 
+
     iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
     giou_norm = np.linalg.norm(iou_diff[:,1], ord=1)  
-
+    print("[real_iou_norm:%f] [fake_iou_norm:%f] [real_Giou_norm:%f] [fake_Giou_norm:%f]"
+                    % (real_iou_norm,fake_iou_norm,real_Giou_norm,fake_Giou_norm))
     return (gradient_penalty,iou_norm,giou_norm)
 
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
