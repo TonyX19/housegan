@@ -157,7 +157,7 @@ def visualizeSingleBatch(fp_loader_test, opt):
                    nrow=12, normalize=False)
         save_image(fake_imgs_tensor, "./exps/{}/{}_{}_fake.png".format(exp_folder, batches_done,giou_norm), \
                    nrow=12, normalize=False)
-    return IUO_penalty
+    return giou_norm
 
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,Giou_p):

@@ -90,7 +90,7 @@ def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,ta
 
     np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
 
-    return iou_list
+    return np.array(iou_list)
 
 
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
@@ -101,7 +101,7 @@ def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              data_parallel)
     fake_iou_list = compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake',serial)
     real_iou_list = compute_IOU_penalty_norm(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
-    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+    iou_diff = real_iou_list - fake_iou_list
 
     iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
     giou_norm = np.linalg.norm(iou_diff[:,1], ord=1)  
