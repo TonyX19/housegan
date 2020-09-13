@@ -239,7 +239,7 @@ class Generator(nn.Module): ## extend nn.Module
         logging.debug('gen z shape: %s' % (str(z.shape)))
         z = z.view(-1, 128)
         given_w = given_w[:,0:3]
-        
+
         logging.debug('gen z shape: %s' % (str(z.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         logging.debug('given_areas.shape: %s' % (str(given_areas.shape)))
@@ -247,7 +247,7 @@ class Generator(nn.Module): ## extend nn.Module
         if True:
             y = given_y.view(-1, 10)
             a = given_areas.view(-1,1)
-            z = torch.cat([z,a, y], 1)
+            z = torch.cat([z, y, a], 1)
         
         logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
         x = self.l1(z)    
