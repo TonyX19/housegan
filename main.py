@@ -228,7 +228,7 @@ if __name__ == '__main__':
             real_mks = Variable(mks.type(Tensor))
             logging.debug('real_mks: %s' % (str(real_mks.shape)))
             given_nds = Variable(nds.type(Tensor))
-            given_eds = eds
+            given_eds = Variable(eds.type(Tensor))
             
             # Set grads on
             for p in discriminator.parameters():
