@@ -49,7 +49,8 @@ if debug : ## debug variable impact the rest of packages
     logging.basicConfig(level=logging.DEBUG)
 
 
-
+#node
+#[n1,1,n2] ---> [n1,Giou,n2,1]
 
 
 cuda = True if torch.cuda.is_available() else False
@@ -133,8 +134,10 @@ def visualizeSingleBatch(fp_loader_test, opt):
         mks, nds, eds, nd_to_sample, ed_to_sample,mks_areas = next(iter(fp_loader_test))
         real_mks = Variable(mks.type(Tensor))
         given_nds = Variable(nds.type(Tensor))
-        given_eds = eds
-                                    
+        eds1 = eds[:,0].view(-1,1)
+        eds2 = eds[:,2].view(-1,1)
+        eds3 = eds[:,3].view(-1,1)
+        given_eds = torch.cat((eds1,eds3,eds2),1)                     
         # Generate a batch of images
         z_shape = [real_mks.shape[0], opt.latent_dim]
         z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
@@ -156,6 +159,11 @@ def visualizeSingleBatch(fp_loader_test, opt):
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
     with torch.no_grad():
+        eds1 = given_eds[:,0].view(-1,1)
+        eds2 = given_eds[:,2].view(-1,1)
+        eds3 = given_eds[:,3].view(-1,1)
+        given_eds = torch.cat((eds1,eds3,eds2),1)   
+
         imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                 nd_to_sample, ed_to_sample)
         save_image(imgs_tensor,"./exps/{}/{}_{}_train_gen.png".format(exp_folder, batches_done,IUO_penalty), \

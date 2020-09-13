@@ -295,20 +295,25 @@ def floorplan_collate_fn(batch):
 
 def transfer_edges(rooms_mks,nodes,edges,im_size=256):
 	edges = edges.to(torch.float32)
+	
 	room_axes = {}
 	for i,mk in enumerate(rooms_mks):
 		room_type = np.where(nodes[i] == 1)[0][0]
 		r =  im_size/mk.shape[-1]
 		room_axes[room_type] = np.array(mask_to_bb(mk)) * r 
 
-
+	o_w_list = []
 	for i,ed in enumerate(edges):
+		rel = ed[1].clone()
+		o_w_list.append(rel)
 		if (int(ed[0]) in room_axes.keys()) and (int(ed[2]) in room_axes.keys()):
 			box1 = room_axes[int(ed[0])]
 			box2 = room_axes[int(ed[2])]
 			iou,Giou = GIOU(np.array([box1]),np.array([box2]))
 			edges[i][1] = torch.tensor(Giou[0],dtype=torch.float32)[0]
-
+	o_w_t = torch.FloatTensor(o_w_list).unsqueeze(1)
+	edges = torch.cat((edges,o_w_t),1)
+	
 	return edges
 
 def compute_mks_area(rooms_mks,im_size=256):

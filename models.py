@@ -238,6 +238,7 @@ class Generator(nn.Module): ## extend nn.Module
     def forward(self, z, given_y=None, given_w=None,given_areas=None):
         logging.debug('gen z shape: %s' % (str(z.shape)))
         z = z.view(-1, 128)
+        given_w = given_w[:,0:3]
         logging.debug('gen z shape: %s' % (str(z.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         logging.debug('given_areas.shape: %s' % (str(given_areas.shape)))
@@ -290,6 +291,7 @@ class Discriminator(nn.Module):
     def forward(self, x, given_y=None, given_w=None, nd_to_sample=None,given_areas=None):
         logging.debug('dis x shape: %s' % (str(x.shape)))
         x = x.view(-1, 1, 32, 32)
+        given_w = given_w[:,0:3]
         logging.debug('dis x shape: %s' % (str(x.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         logging.debug('given_w.shape: %s' % (str(given_w)))
