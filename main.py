@@ -300,7 +300,7 @@ if __name__ == '__main__':
                 
                 # Generate a batch of images
                 z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
-                gen_mks = generator(z, given_nds, given_eds)
+                gen_mks = generator(z, given_nds, given_eds,mks_areas)
 
                 # Score fake images
                 if multi_gpu:

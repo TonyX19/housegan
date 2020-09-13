@@ -115,7 +115,7 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
 
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
-                             given_areas,serial='1',data_parallel=None):
+                             given_areas=None,serial='1',data_parallel=None):
     gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
                              nd_to_sample, ed_to_sample, \
                              given_areas,data_parallel)
@@ -268,7 +268,7 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.encoder = nn.Sequential(
-            *conv_block(10, 16, 3, 1, 1, act="leaky"), #9+1 areas
+            *conv_block(17, 16, 3, 1, 1, act="leaky"), #10 change to 17
             *conv_block(16, 16, 3, 1, 1, act="leaky"),
             *conv_block(16, 16, 3, 1, 1, act="leaky"))
         self.l1 = nn.Sequential(nn.Linear(in_features=10, out_features=8 * 32 ** 2))
@@ -298,7 +298,7 @@ class Discriminator(nn.Module):
             y = self.l1(given_y)
             y = y.view(-1, 8, 32, 32)
             a = self.la(given_areas)
-            a = given_areas.view(-1, 8, 32, 32)
+            a = a.view(-1, 8, 32, 32)
             x = torch.cat([x,y,a], 1)
         
         x = self.encoder(x)
