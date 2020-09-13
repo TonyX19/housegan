@@ -239,7 +239,7 @@ class Generator(nn.Module): ## extend nn.Module
         logging.debug('gen z shape: %s' % (str(z.shape)))
         z = z.view(-1, 128)
         given_w = given_w[:,0:3]
-        given_areas.to(device)
+        
         logging.debug('gen z shape: %s' % (str(z.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         logging.debug('given_areas.shape: %s' % (str(given_areas.shape)))
@@ -293,7 +293,6 @@ class Discriminator(nn.Module):
         logging.debug('dis x shape: %s' % (str(x.shape)))
         x = x.view(-1, 1, 32, 32)
         given_w = given_w[:,0:3]
-        given_areas.to(device)
         logging.debug('dis x shape: %s' % (str(x.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
         logging.debug('given_w.shape: %s' % (str(given_w)))
