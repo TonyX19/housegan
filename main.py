@@ -214,6 +214,7 @@ if __name__ == '__main__':
     #  Training
     # ----------
     batches_done = 0
+    BCE_logitLoss = nn.BCEWithLogitsLoss()
     for epoch in range(opt.n_epochs):
         for i, batch in enumerate(fp_loader):
             # Unpack batch
@@ -289,13 +290,15 @@ if __name__ == '__main__':
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done),None)
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + lambda_gp * gradient_penalty
+            d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
+            #d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
+            #        + lambda_gp * gradient_penalty
 
             # Update discriminator
             d_loss.backward()
             optimizer_D.step()
-            
+            # for parameters in generator.parameters():
+            #     print(parameters)
             # -----------------
             #  Train Generator
             # -----------------
@@ -322,7 +325,8 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     
                 # Update generator
-                g_loss = -torch.mean(fake_validity) - opt.GiouL1_lambda * Giou_p
+                #g_loss = -torch.mean(fake_validity) - opt.GiouL1_lambda * Giou_p
+                g_loss =  BCE_logitLoss(fake_validity,real_validity) + Giou_p
                 g_loss.backward()
                 optimizer_G.step()
 
