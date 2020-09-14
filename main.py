@@ -289,7 +289,7 @@ if __name__ == '__main__':
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done),None)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + lambda_gp * gradient_penalty + Giou_p
+                    + lambda_gp * gradient_penalty
 
             # Update discriminator
             d_loss.backward()
@@ -321,7 +321,7 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     
                 # Update generator
-                g_loss = -torch.mean(fake_validity)
+                g_loss = -torch.mean(fake_validity) - Giou_p
                 g_loss.backward()
                 optimizer_G.step()
 
