@@ -38,6 +38,7 @@ parser.add_argument("--exp_folder", type=str, default='exp', help="destination f
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
+parser.add_argument('--GiouL1_lambda', type=float, default=6, help='lambda for GiouL1')
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
 opt = parser.parse_args()
@@ -321,7 +322,7 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     
                 # Update generator
-                g_loss = -torch.mean(fake_validity) - Giou_p
+                g_loss = -torch.mean(fake_validity) - opt.GiouL1_lambda * Giou_p
                 g_loss.backward()
                 optimizer_G.step()
 

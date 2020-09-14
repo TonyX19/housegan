@@ -28,7 +28,10 @@ def add_pool(x, nd_to_sample):
     batch_size = torch.max(nd_to_sample) + 1
     pooled_x = torch.zeros(batch_size, x.shape[-1]).float().to(device)
     pool_to = nd_to_sample.view(-1, 1).expand_as(x).to(device)
+    logging.debug("pool_to.shape %s " % (str(pool_to.shape)))
+    logging.debug("x.shape %s " % (str(x.shape)))
     pooled_x = pooled_x.scatter_add(0, pool_to, x)
+    logging.debug("pooled_x.shape %s " % (str(pooled_x.shape)))
     return pooled_x
 
 def weights_init_normal(m):
@@ -106,7 +109,8 @@ def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
     if len(iou_diff) == 0:
         return (gradient_penalty,0,1)
 
-    real_iou_norm = np.linalg.norm(real_iou_list[:,0], ord=1) 
+    real_iou_norm = np.linalg.norm(real_iou_list[:,0], ord=1)  #abs each single one, then sum 
+    #nn.L1Loss ~ mean(|y-f(x)|)
     fake_iou_norm = np.linalg.norm(fake_iou_list[:,0], ord=1) 
     real_Giou_norm = np.linalg.norm(real_iou_list[:,1], ord=1) 
     fake_Giou_norm = np.linalg.norm(fake_iou_list[:,1], ord=1) 
