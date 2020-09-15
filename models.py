@@ -210,6 +210,14 @@ class CMP(nn.Module):
         pooled_v_neg = pooled_v_neg.scatter_add(0, neg_v_dst, neg_vecs_src)
         
         # update nodes features
+        feat_mask = torch.gt(feat,0)
+        pooled_v_pos_mask = torch.gt(pooled_v_pos,0)
+        insection = feat[(feat_mask) & (pooled_v_pos_mask)]+pooled_v_pos[(feat_mask) & (pooled_v_pos_mask)]
+        feat[feat_mask] = insection
+
+        
+        #feats + pooled_v_pos
+
         enc_in = torch.cat([feats, pooled_v_pos, pooled_v_neg], 1)
         logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
         out = self.encoder(enc_in)
