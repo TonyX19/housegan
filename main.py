@@ -149,13 +149,13 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-        #IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
+        iou_norm,giou_norm = compute_iou_penalty_norm(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
         # Save images
         save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
         save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
-
+        return iou_norm,giou_norm
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample):
     with torch.no_grad():
@@ -289,7 +289,7 @@ if __name__ == '__main__':
                                                             ed_to_sample.data,str(batches_done))
             
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + k*div_loss
+                    + 
 
             # Update discriminator
             d_loss.backward()
@@ -334,8 +334,8 @@ if __name__ == '__main__':
                     print("checkpoints save done")
                     visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
                     print("training data save done")
-                    vaild_IUO = visualizeSingleBatch(fp_loader_test, opt)
-                    print("images save done [valid IUO:%f]" % (vaild_IUO))
+                    iou_norm,giou_norm = visualizeSingleBatch(fp_loader_test, opt)
+                    print("images save done [valid iou:%f giou:giou_norm]" % (iou_norm,giou_norm))
 
                 batches_done += opt.n_critic
                 

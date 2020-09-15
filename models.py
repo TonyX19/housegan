@@ -159,9 +159,36 @@ def compute_div_loss(D, real_x, fake_x,given_y=None, given_w=None, \
         retain_graph=True,
         only_inputs=True,
     )[0]
+
     grad = grad.view(x_both.shape[0], -1)
     div = (grad.norm(2, dim=1) ** p).mean()
     return div
+
+def compute_div_loss_o(D, x, x_fake,given_y=None, given_w=None, \
+                             nd_to_sample=None, ed_to_sample=None, \
+                             serial='1',data_parallel=None, p=6):
+    indices = nd_to_sample, ed_to_sample
+    batch_size = torch.max(nd_to_sample) + 1
+    dtype, device = x.dtype, x.device
+    # u = torch.FloatTensor(x.shape[0], 1, 1).to(device)
+    # u.data.resize_(x.shape[0], 1, 1)
+    # u.uniform_(0, 1)
+    u = torch.rand((x.shape[0], 1, 1)).to(device)
+    logging.debug("x.shape:%s, x_fake.shape:%s,nd_to_sample.shape:%s" % (str(x.shape),str(x_fake.shape),str(nd_to_sample.shape)))
+    x_both = x.data*u + x_fake.data*(1-u)
+    x_both = x_both.to(device)
+    x_both = Variable(x_both, requires_grad=True)
+    grad_outputs = torch.ones(batch_size, 1).to(device)
+    if data_parallel:
+        _output = data_parallel(D, (x_both, given_y, given_w, nd_to_sample), indices)
+    else:
+        _output = D(x_both, given_y, given_w, nd_to_sample)
+    grad = torch.autograd.grad(outputs=_output, inputs=x_both, grad_outputs=grad_outputs, \
+                               retain_graph=True, create_graph=True, only_inputs=True)[0]
+    div = (grad.norm(2, 1).norm(2, 1)  ** p).mean()
+    return div
+
+
 
 def conv_block(in_channels, out_channels, k, s, p, act=None, upsample=False, spec_norm=False):
     block = []
