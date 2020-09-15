@@ -102,9 +102,7 @@ def compute_iou_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,ser
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
     real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
 
-    if len(real_iou_list) == 0:
-        return 1.,1.,1.,1.;
-    #iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
     
     real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:,0], ord=1)  
     fake_iou_norm = np.linalg.norm(np.array(fake_iou_list)[:,0], ord=1)  
