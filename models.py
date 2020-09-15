@@ -99,6 +99,8 @@ def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sa
     return iou_norm,giou_norm
 
 def compute_iou_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
+    if len(real_iou_list) == 0:
+        return 1.,1.,1.,1.;
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
     real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
 
