@@ -44,7 +44,7 @@ def filter_graphs(graphs, min_h=0.03, min_w=0.03):
         # discard broken samples
         check_none = np.sum([bb is None for bb in rooms_bbs])
         check_node = np.sum([nd == 0 for nd in rooms_type])
-        if (len(rooms_type) == 0) or (check_none > 0) or (check_node > 0):
+        if (len(rooms_type) == 0) or (len(rooms_type) == 1) or (check_none > 0) or (check_node > 0): # add (len(rooms_type) == 1) ,cause affect iou computing
             continue
         
         # filter small rooms
@@ -321,9 +321,6 @@ def floorplan_collate_fn_iou(batch):
 		all_rooms_mks.append(rooms_mks)
 		all_nodes.append(nodes)
 		edges = edges.clone()
-		
-		if len(edges) > 0 :
-			edges = transfer_edges(rooms_mks, nodes, edges)
 		
 		if edges.shape[0] > 0:
 			edges[:, 0] += node_offset
