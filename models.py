@@ -212,6 +212,8 @@ class CMP(nn.Module):
         # update nodes features
         feats_mask = torch.gt(feats,0)
         pooled_v_pos_mask = torch.gt(pooled_v_pos,0)
+        #computing adjoint
+        
         insection = feats[(feats_mask) & (pooled_v_pos_mask)]+pooled_v_pos[(feats_mask) & (pooled_v_pos_mask)]
         feats[feats_mask] = insection
 
