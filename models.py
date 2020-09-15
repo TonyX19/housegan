@@ -98,6 +98,19 @@ def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sa
 
     return iou_norm,giou_norm
 
+def compute_iou_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
+    fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
+    real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
+
+    #iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+    
+    real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:0], ord=1)  
+    fake_iou_norm = np.linalg.norm(np.array(fake_iou_list)[:0], ord=1)  
+    real_giou_norm = np.linalg.norm(np.array(real_iou_list)[:1], ord=1) 
+    fake_giou_norm = np.linalg.norm(np.array(real_iou_list)[:1], ord=1) 
+
+    return real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm
+
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
                              serial='1',data_parallel=None):

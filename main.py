@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_penalty,compute_iou_penalty_norm
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_penalty,compute_iou_norm
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -149,12 +149,15 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-        iou_norm,giou_norm = compute_iou_penalty_norm(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
+        #iou_norm,giou_norm = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
         # Save images
+        extracted_room_stats = [gen_mks,real_mks, given_nds, given_eds, \
+                                               nd_to_sample, ed_to_sample]
         save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
         save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
+        np.save('./tracking/area_stats_'+str(batches_done)+'_valid_pi.npy',extracted_room_stats)
         return iou_norm,giou_norm
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample):
@@ -283,7 +286,7 @@ if __name__ == '__main__':
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done),None,p=p)
-            iou_loss,giou_loss = compute_iou_penalty_norm(real_mks.data, \
+            real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = compute_iou_norm(real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done))
@@ -325,8 +328,8 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [iou_loss:%f] [Giou_loss:%f]"
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,iou_loss,giou_loss))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [r_iou_loss:%f] [f_iou_loss:%f] [r_giou_loss:%f] [f_giou_loss:%f]"
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
