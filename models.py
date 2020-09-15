@@ -39,82 +39,7 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
-def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',serial='1',im_size=256):
-    IOU_penalty = [];
-    maps_batch = x_fake.detach().cpu().numpy()
-    nodes_batch = given_y.detach().cpu().numpy()
-    edges_batch = given_w.detach().cpu().numpy()
-    batch_size = torch.max(nd_to_sample) + 1
-
-    extracted_room_stats = {}
-    for b in range(batch_size):
-        iou_list = []
-        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
-        inds_ed = np.where(ed_to_sample==b)
-        
-        mks = maps_batch[inds_nd]
-        nds = nodes_batch[inds_nd]
-        eds = edges_batch[inds_ed]
-        
-        comb_img = np.ones((im_size, im_size, 3)) * 255
-        extracted_rooms = []
-        for mk, nd in zip(mks, nds):
-            r =  im_size/mk.shape[-1]
-            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
-            h = x1-x0
-            w = y1-y0
-            # if ed_to_sample is None:
-            #     print(h,w)
-
-            if h > 0 and w > 0:
-                extracted_rooms.append([mk, (x0, y0, x1, y1), nd,eds])
-        stats_key = tag +'_'+ str(b)
-        extracted_room_stats[stats_key] = [extracted_rooms]
-        
-        extracted_rooms_len = len(extracted_rooms)    
-        for i in range(extracted_rooms_len):
-            room = extracted_rooms[i]
-            mk, axes, nd,ed = room
-            j = i+1
-            for j in range(j,extracted_rooms_len):
-                room_cmp = extracted_rooms[j]
-                mk_c,axes_c, nd_c,ed_c = room_cmp
-                if not (nd_c == nd).all() :
-                    a_box = BBox(axes)
-                    b_box = BBox(axes_c)
-                    iou_v = BBox.iou(a_box,b_box)
-                    iou_list.append(iou_v)
-
-        extracted_room_stats[stats_key].append(iou_list)
-        # with open('./tracking/train_area_stats.txt', 'w') as outfile:
-        #     json.dump(extracted_room_stats, outfile)     
-        # with open('./tracking/train_area_stats_pi.txt', 'w') as fw:
-        #     pickle.dump(extracted_room_stats, fw) 
-
-        if len(iou_list) == 0 :
-            iuo_avg =  1.5;
-            continue;
-        iuo_avg = np.mean(iou_list)
-                # print(BBox.iou(a,b))
-                # print("-----------------")
-                #print("iou ",iou_2(np.array(axes),np.array(axes_c)))
-                #print(iou(axes,axes_c))
-                #print(nd_c,nd)
-        # print(iou_list)
-        # a = np.where(eds[:,1]>0)
-        # rel = np.array(eds[a])
-        # all_rr = np.concatenate((rel[:,0],rel[:,2]),0)
-        # print(np.unique(all_rr))
-        # print(len(extracted_rooms))
-        # exit();
-        # draw graph
-    IOU_penalty.append(iuo_avg)
-    IOU_penalty_avg = np.mean(IOU_penalty)
-    np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
-    return IOU_penalty_avg
-
-def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',serial='1',im_size=256):
-    IOU_penalty = [];
+def compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',im_size=256):
     maps_batch = x_fake.detach().cpu().numpy()
     nodes_batch = given_y.detach().cpu().numpy()
     edges_batch = given_w.detach().cpu().numpy()
@@ -158,10 +83,20 @@ def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,ta
                 iou_list.append(iou_dict[key])
         extracted_room_stats[stats_key].append(iou_dict)
 
-    np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
+    #np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
 
     return iou_list
 
+def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
+    fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
+    real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
+
+    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+    
+    iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
+    giou_norm = np.linalg.norm(iou_diff[:,1], ord=1) 
+
+    return iou_norm,giou_norm
 
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
@@ -169,14 +104,10 @@ def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
     gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
                              nd_to_sample, ed_to_sample, \
                              data_parallel)
-    fake_iou_list = compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake',serial)
-    real_iou_list = compute_IOU_penalty_norm(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
-    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
-
-    iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
-    giou_norm = np.linalg.norm(iou_diff[:,1], ord=1)  
-
-    return (gradient_penalty,iou_norm,giou_norm)
+    iou_norm,giou_norm = compute_iou_penalty_norm(x,x_fake, given_y, given_w, \
+                             nd_to_sample, ed_to_sample)
+                             
+    return gradient_penalty,iou_norm,giou_norm
 
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
@@ -205,18 +136,19 @@ def compute_div_loss(D, real_x, fake_x,given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
                              serial='1',data_parallel=None, p=6):
     indices = nd_to_sample, ed_to_sample
-    batch_size = torch.max(nd_to_sample) + 1
+    #batch_size = torch.max(nd_to_sample) + 1
     dtype, device = real_x.dtype, real_x.device
-    alpha = torch.rand((real_x.shape[0], 1, 1, 1)).to(device)
+    alpha = torch.rand((real_x.shape[0], 1, 1)).to(device)
     x_both = (alpha * real_x + (1-alpha) * fake_x).requires_grad_(True)
-    x_both = x_.to(device)
-    grad_outputs = torch.ones_like(_output).to(device)
+    x_both = x_both.to(device)
+    x_both = Variable(x_both, requires_grad=True)
 
     if data_parallel:
         _output = data_parallel(D, (x_both, given_y, given_w, nd_to_sample), indices)
     else:
         _output = D(x_both, given_y, given_w, nd_to_sample)
-
+    
+    grad_outputs = torch.ones_like(_output).to(device)
 
     # cal f'(x)
     grad = autograd.grad(

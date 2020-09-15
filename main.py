@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_penalty,compute_IOU_penalty
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_penalty,compute_iou_penalty_norm
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -145,24 +145,23 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-        IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
+        #IUO_penalty = compute_IOU_penalty(gen_mks, given_nds, given_eds,nd_to_sample, ed_to_sample,tag='vaild', serial = str(batches_done))
         # Save images
-        save_image(real_imgs_tensor, "./exps/{}/{}_{}_real.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
-        save_image(fake_imgs_tensor, "./exps/{}/{}_{}_fake.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
-    return IUO_penalty
 
 
-def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample,IUO_penalty):
+def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample):
     with torch.no_grad():
         imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                 nd_to_sample, ed_to_sample)
-        save_image(imgs_tensor,"./exps/{}/{}_{}_train_gen.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(imgs_tensor,"./exps/{}/{}_train_gen.png".format(exp_folder, batches_done), \
                     nrow=12, normalize=False)
         imgs_tensor = combine_images_maps(real_mks, given_nds, given_eds, \
                                                 nd_to_sample, ed_to_sample)
-        save_image(imgs_tensor,"./exps/{}/{}_{}_train_real.png".format(exp_folder, batches_done,IUO_penalty), \
+        save_image(imgs_tensor,"./exps/{}/{}_train_real.png".format(exp_folder, batches_done), \
                     nrow=12, normalize=False)
     return
     
@@ -280,6 +279,11 @@ if __name__ == '__main__':
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done),None,p=p)
+            iou_loss,giou_loss = compute_iou_penalty_norm(real_mks.data, \
+                                                            gen_mks.data, given_nds.data, \
+                                                            given_eds.data, nd_to_sample.data, \
+                                                            ed_to_sample.data,str(batches_done))
+            
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
                     + k*div_loss
 
@@ -317,14 +321,14 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [grad_p:%f] [iou_loss:%f] [Giou_loss:%f]"
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),gradient_penalty,iou_p,Giou_p))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [iou_loss:%f] [Giou_loss:%f]"
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,iou_loss,giou_loss))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                     print("checkpoints save done")
-                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample,IUO_penalty)
+                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
                     print("training data save done")
                     vaild_IUO = visualizeSingleBatch(fp_loader_test, opt)
                     print("images save done [valid IUO:%f]" % (vaild_IUO))
