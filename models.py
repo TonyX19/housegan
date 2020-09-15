@@ -203,17 +203,27 @@ class CMP(nn.Module):
         
         # pool negative edges
         neg_inds = torch.where(edges[:, 1] < 0)
-        neg_v_src = torch.cat([edges[neg_inds[0], 0], edges[neg_inds[0], 2]]).long()
+        neg_v_src = torch.cat([ edges[neg_inds[0], 0], edges[neg_inds[0], 2] ]).long()
+        #[
+        # edges[neg_inds[0], 0],
+        # edges[neg_inds[0], 2]
+        # ]
         neg_v_dst = torch.cat([edges[neg_inds[0], 2], edges[neg_inds[0], 0]]).long()
+        #[
+        # edges[neg_inds[0], 2],
+        # edges[neg_inds[0], 0]
+        # ]
         neg_vecs_src = feats[neg_v_src.contiguous()]
+        #neg_vecs_src = feats(col)[idx=neg_v_src.val]
         neg_v_dst = neg_v_dst.view(-1, 1, 1, 1).expand_as(neg_vecs_src).to(device)
         pooled_v_neg = pooled_v_neg.scatter_add(0, neg_v_dst, neg_vecs_src)
+        #根据neg_v_dst 打散的同时 相同node_id的value 会聚集在一起
         
         # update nodes features
         feats_mask = torch.gt(feats,0)
         pooled_v_pos_mask = torch.gt(pooled_v_pos,0)
         #computing adjoint
-        
+
         insection = feats[(feats_mask) & (pooled_v_pos_mask)]+pooled_v_pos[(feats_mask) & (pooled_v_pos_mask)]
         feats[feats_mask] = insection
 
