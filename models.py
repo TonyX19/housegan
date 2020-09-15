@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
-from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb
+from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU
 import torch.nn.utils.spectral_norm as spectral_norm
 import logging
 import json
@@ -113,15 +113,70 @@ def compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fa
     np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
     return IOU_penalty_avg
 
+def compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',serial='1',im_size=256):
+    IOU_penalty = [];
+    maps_batch = x_fake.detach().cpu().numpy()
+    nodes_batch = given_y.detach().cpu().numpy()
+    edges_batch = given_w.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    np.seterr(divide='ignore',invalid='ignore')
+    extracted_room_stats = {}
+    for b in range(batch_size):
+        iou_list = []
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        inds_ed = np.where(ed_to_sample==b)
+        
+        mks = maps_batch[inds_nd]
+        nds = nodes_batch[inds_nd]
+        eds = edges_batch[inds_ed]
+        
+        comb_img = np.ones((im_size, im_size, 3)) * 255
+        extracted_rooms = []
+        for mk, nd in zip(mks, nds):
+            r =  im_size/mk.shape[-1]
+            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
+            extracted_rooms.append([mk, (x0, y0, x1, y1), nd,eds])
+            
+        stats_key = tag +'_'+ str(b)
+        extracted_room_stats[stats_key] = [extracted_rooms]
+        extracted_rooms_len = len(extracted_rooms)  
+          
+        iou_dict = {}
+        iou_list = []
+        for i in range(extracted_rooms_len):
+            room = extracted_rooms[i]
+            mk, axes, nd,ed = room
+            j = i+1
+            for j in range(j,extracted_rooms_len):
+                room_cmp = extracted_rooms[j]
+                mk_c,axes_c, nd_c,ed_c = room_cmp
+                a_box = list(axes)
+                b_box = list(axes_c)
+                iou,Giou = GIOU(np.array([a_box]),np.array([b_box]))
+                key = str(i)+'_'+str(j)
+                iou_dict[key] =  [iou[0][0],Giou[0][0]]
+                iou_list.append(iou_dict[key])
+        extracted_room_stats[stats_key].append(iou_dict)
+
+    np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
+
+    return iou_list
+
+
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
                              serial='1',data_parallel=None):
     gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
                              nd_to_sample, ed_to_sample, \
                              data_parallel)
-    fake_IOU_penalty = compute_IOU_penalty(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake',serial)
-    real_IOU_penalty = compute_IOU_penalty(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
-    return (gradient_penalty,fake_IOU_penalty,real_IOU_penalty)
+    fake_iou_list = compute_IOU_penalty_norm(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake',serial)
+    real_iou_list = compute_IOU_penalty_norm(x,given_y,given_w,nd_to_sample,ed_to_sample,'real',serial)
+    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+
+    iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
+    giou_norm = np.linalg.norm(iou_diff[:,1], ord=1)  
+
+    return (gradient_penalty,iou_norm,giou_norm)
 
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \

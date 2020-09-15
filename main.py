@@ -3,7 +3,7 @@ import os
 import numpy as np
 import math
 
-from floorplan_dataset_maps import FloorplanGraphDataset, floorplan_collate_fn_iou
+from floorplan_dataset_maps import FloorplanGraphDataset, floorplan_collate_fn
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
 
@@ -179,14 +179,14 @@ if __name__ == '__main__':
                                             batch_size=opt.batch_size, 
                                             shuffle=True,
                                             num_workers=opt.n_cpu,
-                                            collate_fn=floorplan_collate_fn_iou)
+                                            collate_fn=floorplan_collate_fn)
 
     fp_dataset_test = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=opt.target_set, split='eval')
     fp_loader_test = torch.utils.data.DataLoader(fp_dataset_test, 
                                             batch_size=64, 
                                             shuffle=False,
                                             num_workers=opt.n_cpu,
-                                            collate_fn=floorplan_collate_fn_iou)
+                                            collate_fn=floorplan_collate_fn)
 
     # Optimizers
     if opt.optim == 'adam' :
@@ -273,17 +273,17 @@ if __name__ == '__main__':
         
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                gradient_penalty,IUO_penalty,real_IUO = compute_penalty(discriminator, real_mks.data, \
+                gradient_penalty,iou_p,Giou_p = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data,\
                                                              ed_to_sample.data,str(batches_done),data_parallel)
             else:
-                gradient_penalty,IUO_penalty,real_IUO = compute_penalty(discriminator, real_mks.data, \
+                gradient_penalty,iou_p,Giou_p = compute_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done),None)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + lambda_gp * gradient_penalty
+                    + lambda_gp * gradient_penalty + Giou_p
 
             # Update discriminator
             d_loss.backward()
@@ -319,8 +319,8 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [grad_p:%f] [IUO_p:%f] [Real_IUO:%f]"
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),gradient_penalty,IUO_penalty,real_IUO))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [grad_p:%f] [iou_loss:%f] [Giou_loss:%f]"
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),gradient_penalty,iou_p,Giou_p))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
