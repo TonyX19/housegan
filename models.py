@@ -104,10 +104,10 @@ def compute_iou_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,ser
 
     #iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
     
-    real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:0], ord=1)  
-    fake_iou_norm = np.linalg.norm(np.array(fake_iou_list)[:0], ord=1)  
-    real_giou_norm = np.linalg.norm(np.array(real_iou_list)[:1], ord=1) 
-    fake_giou_norm = np.linalg.norm(np.array(fake_iou_list)[:1], ord=1) 
+    real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:,0], ord=1)  
+    fake_iou_norm = np.linalg.norm(np.array(fake_iou_list)[:,0], ord=1)  
+    real_giou_norm = np.linalg.norm(np.array(real_iou_list)[:,1], ord=1) 
+    fake_giou_norm = np.linalg.norm(np.array(fake_iou_list)[:,1], ord=1) 
 
     return real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm
 

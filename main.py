@@ -149,16 +149,16 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         fake_imgs_tensor = combine_images_maps(gen_mks, given_nds, given_eds, \
                                                nd_to_sample, ed_to_sample)
-        #iou_norm,giou_norm = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
+        #iou_norm,giou_norm = compute_iou_list(real_mks,given_y,given_w,nd_to_sample,ed_to_sample,'valid')
         # Save images
-        extracted_room_stats = [gen_mks,real_mks, given_nds, given_eds, \
-                                               nd_to_sample, ed_to_sample]
+        extracted_room_stats = [gen_mks.detach().cpu().numpy(),real_mks.detach().cpu().numpy(), given_nds.detach().cpu().numpy(), given_eds.detach().cpu().numpy(), \
+                                               nd_to_sample.detach().cpu().numpy(), ed_to_sample.detach().cpu().numpy()]
         save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
         save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
         np.save('./tracking/area_stats_'+str(batches_done)+'_valid_pi.npy',extracted_room_stats)
-        return iou_norm,giou_norm
+        #return iou_norm,giou_norm
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample):
     with torch.no_grad():
@@ -337,8 +337,8 @@ if __name__ == '__main__':
                     print("checkpoints save done")
                     visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
                     print("training data save done")
-                    iou_norm,giou_norm = visualizeSingleBatch(fp_loader_test, opt)
-                    print("images save done [valid iou:%f giou:giou_norm]" % (iou_norm,giou_norm))
+                    visualizeSingleBatch(fp_loader_test, opt)
+                    #print("images save done [valid iou:%f giou:giou_norm]" % (iou_norm,giou_norm))
 
                 batches_done += opt.n_critic
                 
