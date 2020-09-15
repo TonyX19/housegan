@@ -289,7 +289,7 @@ if __name__ == '__main__':
                                                             ed_to_sample.data,str(batches_done))
             
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + 
+                    + k*div_loss
 
             # Update discriminator
             d_loss.backward()
