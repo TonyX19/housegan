@@ -286,10 +286,10 @@ if __name__ == '__main__':
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done),None,p=p)
-            gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-                                                        gen_mks.data, given_nds.data, \
-                                                        given_eds.data, nd_to_sample.data, \
-                                                        None, None)
+            # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+            #                                             gen_mks.data, given_nds.data, \
+            #                                             given_eds.data, nd_to_sample.data, \
+            #                                             None, None)
             real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = compute_iou_norm(real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
@@ -332,8 +332,8 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [r_iou_loss:%f] [f_iou_loss:%f] [r_giou_loss:%f] [f_giou_loss:%f] [gp_loss:%f]"
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm,gradient_penalty))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [r_iou_loss:%f] [f_iou_loss:%f] [r_giou_loss:%f] [f_giou_loss:%f]"
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
