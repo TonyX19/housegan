@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_gradient_penalty, weights_init_normal,compute_penalty,compute_IOU_penalty
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_penalty,compute_IOU_penalty
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -266,20 +266,22 @@ if __name__ == '__main__':
             else:
                 fake_validity = discriminator(gen_mks.detach(), given_nds.detach(), \
                                             given_eds.detach(), nd_to_sample.detach())
-        
+
+            k = 2
+            p = 6
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                gradient_penalty,iou_p,Giou_p = compute_penalty(discriminator, real_mks.data, \
+                div_loss = compute_div_loss(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data,\
-                                                             ed_to_sample.data,str(batches_done),data_parallel)
+                                                             ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                gradient_penalty,iou_p,Giou_p = compute_penalty(discriminator, real_mks.data, \
+                div_loss = compute_div_loss(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            ed_to_sample.data,str(batches_done),None)
+                                                            ed_to_sample.data,str(batches_done),None,p=p)
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + lambda_gp * gradient_penalty + Giou_p
+                    + k*div_loss
 
             # Update discriminator
             d_loss.backward()
