@@ -347,8 +347,8 @@ class CMP(nn.Module):
 
             intersection_mask_bool = (feats_mask) & (neighber_mask)
 
-            neighber_node_mks.mask_fill_(~intersection_mask_bool,0)
-
+            neighber_node_mks.masked_fill_(~intersection_mask_bool,0)
+            
             # if torch.sum(pooled_intersec_vectors[center_node]) == 0:
             #     center_node_mks.mask_fill_(~intersection_mask_bool,0)
             #     pooled_intersec_vectors[center_node] += 
@@ -383,7 +383,7 @@ class CMP(nn.Module):
             neighber_mask = torch.gt(feats[neighber_node],0)
 
             intersection_mask_bool = (feats_mask) & (neighber_mask)
-            neighber_node_mks.mask_fill_(~intersection_mask_bool,0)
+            neighber_node_mks.masked_fill_(~intersection_mask_bool,0)
             #pooled_intersec_vectors[center_node] += intersection_mask
 
 
