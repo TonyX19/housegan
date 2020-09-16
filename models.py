@@ -28,7 +28,10 @@ def add_pool(x, nd_to_sample):
     batch_size = torch.max(nd_to_sample) + 1
     pooled_x = torch.zeros(batch_size, x.shape[-1]).float().to(device)
     pool_to = nd_to_sample.view(-1, 1).expand_as(x).to(device)
+    logging.debug("pool_to.shape %s " % (str(pool_to.shape)))
+    logging.debug("x.shape %s " % (str(x.shape)))
     pooled_x = pooled_x.scatter_add(0, pool_to, x)
+    logging.debug("pooled_x.shape %s " % (str(pooled_x.shape)))
     return pooled_x
 
 def weights_init_normal(m):
@@ -44,7 +47,7 @@ def compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake'
     nodes_batch = given_y.detach().cpu().numpy()
     edges_batch = given_w.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
-    np.seterr(divide='ignore',invalid='ignore')
+    np.seterr(divide='ignore',invalid='ignore') ### ignore nan
     extracted_room_stats = {}
     for b in range(batch_size):
         iou_list = []
@@ -78,10 +81,16 @@ def compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake'
                 a_box = list(axes)
                 b_box = list(axes_c)
                 iou,Giou = GIOU(np.array([a_box]),np.array([b_box]))
+                if np.isnan(iou[0][0]):
+                    iou[0][0] = 0
+                if np.isnan(Giou[0][0]):
+                    Giou[0][0] = -1
                 key = str(i)+'_'+str(j)
                 iou_dict[key] =  [iou[0][0],Giou[0][0]]
                 iou_list.append(iou_dict[key])
         extracted_room_stats[stats_key].append(iou_dict)
+    
+    #np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
 
     #np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
 
@@ -262,13 +271,33 @@ class CMP(nn.Module):
         
         # pool negative edges
         neg_inds = torch.where(edges[:, 1] < 0)
-        neg_v_src = torch.cat([edges[neg_inds[0], 0], edges[neg_inds[0], 2]]).long()
+        neg_v_src = torch.cat([ edges[neg_inds[0], 0], edges[neg_inds[0], 2] ]).long()
+        #[
+        # edges[neg_inds[0], 0],
+        # edges[neg_inds[0], 2]
+        # ]
         neg_v_dst = torch.cat([edges[neg_inds[0], 2], edges[neg_inds[0], 0]]).long()
+        #[
+        # edges[neg_inds[0], 2],
+        # edges[neg_inds[0], 0]
+        # ]
         neg_vecs_src = feats[neg_v_src.contiguous()]
+        #neg_vecs_src = feats(col)[idx=neg_v_src.val]
         neg_v_dst = neg_v_dst.view(-1, 1, 1, 1).expand_as(neg_vecs_src).to(device)
         pooled_v_neg = pooled_v_neg.scatter_add(0, neg_v_dst, neg_vecs_src)
+        #根据neg_v_dst 打散的同时 相同node_id的value 会聚集在一起
         
         # update nodes features
+        feats_mask = torch.gt(feats,0)
+        pooled_v_pos_mask = torch.gt(pooled_v_pos,0)
+        #computing adjoint
+
+        insection = feats[(feats_mask) & (pooled_v_pos_mask)]+pooled_v_pos[(feats_mask) & (pooled_v_pos_mask)]
+        feats[feats_mask] = insection
+
+
+        #feats + pooled_v_pos
+
         enc_in = torch.cat([feats, pooled_v_pos, pooled_v_neg], 1)
         logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
         out = self.encoder(enc_in)

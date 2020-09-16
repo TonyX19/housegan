@@ -38,6 +38,7 @@ parser.add_argument("--exp_folder", type=str, default='exp', help="destination f
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
+parser.add_argument('--GiouL1_lambda', type=float, default=6, help='lambda for GiouL1')
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
 opt = parser.parse_args()
@@ -60,11 +61,9 @@ multi_gpu = False
 #                                                                         opt.latent_dim, opt.b1, opt.b2)
 exp_folder = "{}_{}".format(opt.exp_folder, opt.target_set)
 os.makedirs("./exps/"+exp_folder, exist_ok=True)
-os.makedirs("./exps/"+exp_folder, exist_ok=True)
 os.makedirs("./temp/", exist_ok=True)
 os.makedirs("./tracking/", exist_ok=True)
 os.makedirs("./checkpoints/", exist_ok=True)
-
 # Loss function
 adversarial_loss = torch.nn.BCEWithLogitsLoss()
 
@@ -209,6 +208,7 @@ if __name__ == '__main__':
     #  Training
     # ----------
     batches_done = 0
+    BCE_logitLoss = nn.BCEWithLogitsLoss()
     for epoch in range(opt.n_epochs):
         for i, batch in enumerate(fp_loader):
             # Unpack batch
@@ -301,7 +301,8 @@ if __name__ == '__main__':
             # Update discriminator
             d_loss.backward()
             optimizer_D.step()
-            
+            # for parameters in generator.parameters():
+            #     print(parameters)
             # -----------------
             #  Train Generator
             # -----------------
@@ -328,7 +329,8 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     
                 # Update generator
-                g_loss = -torch.mean(fake_validity)
+                #g_loss = -torch.mean(fake_validity) - opt.GiouL1_lambda * Giou_p
+                g_loss =  BCE_logitLoss(fake_validity,real_validity) + Giou_p
                 g_loss.backward()
                 optimizer_G.step()
 
