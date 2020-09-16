@@ -338,13 +338,22 @@ class CMP(nn.Module):
         for i,edge in enumerate(edges[pos_inds]):
             center_node = edge[0]
             neighber_node = edge[2]
+            #center_node_mks = feats[center_node].clone()
+            neighber_node_mks = feats[neighber_node].clone()
+
 
             feats_mask = torch.gt(feats[center_node],0)
             neighber_mask = torch.gt(feats[neighber_node],0)
 
             intersection_mask_bool = (feats_mask) & (neighber_mask)
-            intersection_mask = intersection_mask_bool.float()
-            pooled_intersec_vectors[center_node] += intersection_mask
+
+            neighber_node_mks.mask_fill_(~intersection_mask_bool,0)
+
+            # if torch.sum(pooled_intersec_vectors[center_node]) == 0:
+            #     center_node_mks.mask_fill_(~intersection_mask_bool,0)
+            #     pooled_intersec_vectors[center_node] += 
+            #intersection_mask = intersection_mask_bool.float()
+            pooled_intersec_vectors[center_node] += neighber_node_mks
 
         # pool negative edges
         neg_inds = torch.where(edges[:, 1] < 0)
@@ -368,12 +377,13 @@ class CMP(nn.Module):
         for i,edge in enumerate(edges[neg_inds]):
             center_node = edge[0]
             neighber_node = edge[2]
+            neighber_node_mks = feats[neighber_node].clone()
 
             feats_mask = torch.gt(feats[center_node],0)
             neighber_mask = torch.gt(feats[neighber_node],0)
 
             intersection_mask_bool = (feats_mask) & (neighber_mask)
-            intersection_mask = intersection_mask_bool.float()
+            neighber_node_mks.mask_fill_(~intersection_mask_bool,0)
             #pooled_intersec_vectors[center_node] += intersection_mask
 
 
