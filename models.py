@@ -338,7 +338,7 @@ class CMP(nn.Module):
         for i,edge in enumerate(edges[pos_inds]):
             center_node = edge[0]
             neighber_node = edge[2]
-            #center_node_mks = feats[center_node].clone()
+            center_node_mks = feats[center_node].clone()
             neighber_node_mks = feats[neighber_node].clone()
 
 
@@ -348,10 +348,10 @@ class CMP(nn.Module):
             intersection_mask_bool = (feats_mask) & (neighber_mask)
 
             neighber_node_mks.masked_fill_(~intersection_mask_bool,0)
-            
-            # if torch.sum(pooled_intersec_vectors[center_node]) == 0:
-            #     center_node_mks.mask_fill_(~intersection_mask_bool,0)
-            #     pooled_intersec_vectors[center_node] += 
+
+            if torch.sum(pooled_intersec_vectors[center_node]) == 0:
+                #center_node_mks.mask_fill_(~intersection_mask_bool,0)
+                pooled_intersec_vectors[center_node] += center_node_mks
             #intersection_mask = intersection_mask_bool.float()
             pooled_intersec_vectors[center_node] += neighber_node_mks
 
