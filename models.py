@@ -246,10 +246,67 @@ class CMP(nn.Module):
         super(CMP, self).__init__()
         self.in_channels = in_channels
         self.encoder = nn.Sequential(
-            *conv_block(3*in_channels, 2*in_channels, 3, 1, 1, act="leaky"),
-            *conv_block(2*in_channels, 2*in_channels, 3, 1, 1, act="leaky"),
-            *conv_block(2*in_channels, in_channels, 3, 1, 1, act="leaky"))
+            *conv_block(2*in_channels, 1*in_channels, 3, 1, 1, act="leaky"),
+            *conv_block(1*in_channels, 1*in_channels, 3, 1, 1, act="leaky"),
+            *conv_block(1*in_channels, in_channels, 3, 1, 1, act="leaky"))
              
+    # def forward(self, feats, edges=None):
+        
+    #     logging.debug("CMP:fea:%s,edgs:%s" % (str(feats.shape),str(edges.shape)))
+    #     # allocate memory
+    #     dtype, device = feats.dtype, feats.device
+    #     edges = edges.view(-1, 3)
+    #     V, E = feats.size(0), edges.size(0)
+    #     pooled_v_pos = torch.zeros(V, feats.shape[-3], feats.shape[-1], feats.shape[-1], dtype=dtype, device=device)
+    #     pooled_v_neg = torch.zeros(V, feats.shape[-3], feats.shape[-1], feats.shape[-1], dtype=dtype, device=device)
+        
+    #     # pool positive edges
+    #     pos_inds = torch.where(edges[:, 1] > 0)
+    #     pos_v_src = torch.cat([edges[pos_inds[0], 0], edges[pos_inds[0], 2]]).long()
+    #     pos_v_dst = torch.cat([edges[pos_inds[0], 2], edges[pos_inds[0], 0]]).long()
+    #     logging.debug("CMP:pos_v_src:%s" % (str(pos_v_src.shape)))
+    #     pos_vecs_src = feats[pos_v_src.contiguous()]
+    #     pos_v_dst = pos_v_dst.view(-1, 1, 1, 1).expand_as(pos_vecs_src).to(device)
+    #     pooled_v_pos = pooled_v_pos.scatter_add(0, pos_v_dst, pos_vecs_src)
+        
+    #     # pool negative edges
+    #     neg_inds = torch.where(edges[:, 1] < 0)
+    #     neg_v_src = torch.cat([ edges[neg_inds[0], 0], edges[neg_inds[0], 2] ]).long()
+    #     #[
+    #     # edges[neg_inds[0], 0],
+    #     # edges[neg_inds[0], 2]
+    #     # ]
+
+    #     neg_v_dst = torch.cat([edges[neg_inds[0], 2], edges[neg_inds[0], 0]]).long()
+    #     print(feats.shape,neg_v_dst.shape)
+    #     exit();
+    #     #[
+    #     # edges[neg_inds[0], 2],
+    #     # edges[neg_inds[0], 0]
+    #     # ]
+    #     neg_vecs_src = feats[neg_v_src.contiguous()]
+    #     #neg_vecs_src = feats(col)[idx=neg_v_src.val]
+    #     neg_v_dst = neg_v_dst.view(-1, 1, 1, 1).expand_as(neg_vecs_src).to(device)
+    #     #b.expand_as(a) repeat as a, but not value ,only size.keep original(b) value 
+    #     pooled_v_neg = pooled_v_neg.scatter_add(0, neg_v_dst, neg_vecs_src)
+    #     #根据neg_v_dst 打散的同时 相同node_id的value 会聚集在一起
+        
+    #     # # update nodes features
+    #     # feats_mask = torch.gt(feats,0)
+    #     # pooled_v_pos_mask = torch.gt(pooled_v_pos,0)
+    #     # #computing adjoint
+
+    #     # insection = feats[(feats_mask) & (pooled_v_pos_mask)]+pooled_v_pos[(feats_mask) & (pooled_v_pos_mask)]
+    #     # feats[feats_mask] = insection
+
+
+    #     #feats + pooled_v_pos
+
+    #     enc_in = torch.cat([feats, pooled_v_pos, pooled_v_neg], 1)
+    #     logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
+    #     out = self.encoder(enc_in)
+    #     return out
+    
     def forward(self, feats, edges=None):
         
         logging.debug("CMP:fea:%s,edgs:%s" % (str(feats.shape),str(edges.shape)))
@@ -257,8 +314,11 @@ class CMP(nn.Module):
         dtype, device = feats.dtype, feats.device
         edges = edges.view(-1, 3)
         V, E = feats.size(0), edges.size(0)
+
         pooled_v_pos = torch.zeros(V, feats.shape[-3], feats.shape[-1], feats.shape[-1], dtype=dtype, device=device)
+        #pooled_adjoint_vec
         pooled_v_neg = torch.zeros(V, feats.shape[-3], feats.shape[-1], feats.shape[-1], dtype=dtype, device=device)
+        pooled_intersec_vectors = torch.zeros(V, feats.shape[-3], feats.shape[-1], feats.shape[-1], dtype=dtype, device=device)
         
         # pool positive edges
         pos_inds = torch.where(edges[:, 1] > 0)
@@ -267,8 +327,25 @@ class CMP(nn.Module):
         logging.debug("CMP:pos_v_src:%s" % (str(pos_v_src.shape)))
         pos_vecs_src = feats[pos_v_src.contiguous()]
         pos_v_dst = pos_v_dst.view(-1, 1, 1, 1).expand_as(pos_vecs_src).to(device)
+        logging.debug("CMP:pos_v_dst:%s" % (str(pos_v_dst.shape)))
+        logging.debug("CMP:pooled_v_pos:%s" % (str(pooled_v_pos.shape)))
+        logging.debug("CMP:pos_vecs_src:%s" % (str(pos_vecs_src.shape)))
         pooled_v_pos = pooled_v_pos.scatter_add(0, pos_v_dst, pos_vecs_src)
+        #将相关节点合成到feats内的一个节点,feats[0] = sum(all_rel_feats[nodes])
         
+        #pool intersection
+        # update nodes features
+        for i,edge in enumerate(edges[pos_inds]):
+            center_node = edge[0]
+            neighber_node = edge[2]
+
+            feats_mask = torch.gt(feats[center_node],0)
+            neighber_mask = torch.gt(feats[neighber_node],0)
+
+            intersection_mask_bool = (feats_mask) & (neighber_mask)
+            intersection_mask = intersection_mask_bool.float()
+            pooled_intersec_vectors[center_node] += intersection_mask
+
         # pool negative edges
         neg_inds = torch.where(edges[:, 1] < 0)
         neg_v_src = torch.cat([ edges[neg_inds[0], 0], edges[neg_inds[0], 2] ]).long()
@@ -281,24 +358,28 @@ class CMP(nn.Module):
         # edges[neg_inds[0], 2],
         # edges[neg_inds[0], 0]
         # ]
+        #edges = [feats_idx,(-1,1),feats_idx]
         neg_vecs_src = feats[neg_v_src.contiguous()]
         #neg_vecs_src = feats(col)[idx=neg_v_src.val]
         neg_v_dst = neg_v_dst.view(-1, 1, 1, 1).expand_as(neg_vecs_src).to(device)
+        #b.expand_as(a) repeat as a, but not value ,only size.keep original(b) value 
         pooled_v_neg = pooled_v_neg.scatter_add(0, neg_v_dst, neg_vecs_src)
         #根据neg_v_dst 打散的同时 相同node_id的value 会聚集在一起
-        
-        # update nodes features
-        feats_mask = torch.gt(feats,0)
-        pooled_v_pos_mask = torch.gt(pooled_v_pos,0)
-        #computing adjoint
+        for i,edge in enumerate(edges[neg_inds]):
+            center_node = edge[0]
+            neighber_node = edge[2]
 
-        insection = feats[(feats_mask) & (pooled_v_pos_mask)]+pooled_v_pos[(feats_mask) & (pooled_v_pos_mask)]
-        feats[feats_mask] = insection
+            feats_mask = torch.gt(feats[center_node],0)
+            neighber_mask = torch.gt(feats[neighber_node],0)
+
+            intersection_mask_bool = (feats_mask) & (neighber_mask)
+            intersection_mask = intersection_mask_bool.float()
+            #pooled_intersec_vectors[center_node] += intersection_mask
 
 
         #feats + pooled_v_pos
-
-        enc_in = torch.cat([feats, pooled_v_pos, pooled_v_neg], 1)
+        #pooled_v_pos based on fake data，not reasonable
+        enc_in = torch.cat([feats,pooled_intersec_vectors], 1)
         logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
         out = self.encoder(enc_in)
         return out

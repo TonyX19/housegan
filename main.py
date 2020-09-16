@@ -327,10 +327,10 @@ if __name__ == '__main__':
                                                 indices)
                 else:
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
-                    
+                giou_p = real_giou_norm - fake_giou_norm
                 # Update generator
-                #g_loss = -torch.mean(fake_validity) - opt.GiouL1_lambda * Giou_p
-                g_loss =  BCE_logitLoss(fake_validity,real_validity) + Giou_p
+                g_loss = -torch.mean(fake_validity) + giou_p
+                #g_loss =  BCE_logitLoss(fake_validity,real_validity) + Giou_p
                 g_loss.backward()
                 optimizer_G.step()
 
