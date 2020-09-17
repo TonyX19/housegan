@@ -534,10 +534,10 @@ def axes_to_mask(z_axes,img_size=32):
     for i,v in enumerate(z_axes):
       
       x0,y0,x1,y1 = v
-      x_min = int(torch.min(x0,x1).detach().numpy())
-      x_max = int(torch.max(x0,x1).detach().numpy())
-      y_min = int(torch.min(y0,y1).detach().numpy())
-      y_max = int(torch.max(y0,y1).detach().numpy())
+      x_min = int(torch.min(x0,x1).detach().cpu().numpy())
+      x_max = int(torch.max(x0,x1).detach().cpu().numpy())
+      y_min = int(torch.min(y0,y1).detach().cpu().numpy())
+      y_max = int(torch.max(y0,y1).detach().cpu().numpy())
 
       for j in range(x_min,x_max):
         for k in range(y_min,y_max):
