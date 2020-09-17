@@ -1115,6 +1115,9 @@ def GIOU (boxes1 , boxes2 ):
 
     area1 = (x2 -x1) * (y2 -y1)  #求取框的面积
     area2 = (xx2-xx1) * (yy2- yy1)
+    if area1 == area2 == 0.:
+        return [np.array([1.])],[np.array([1.])]
+        
     for i in range (num):
         inter_max_x = np.minimum(x2[i], xx2[:])   #求取重合的坐标及面积
         inter_max_y = np.minimum(y2[i], yy2[:])
