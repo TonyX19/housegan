@@ -173,6 +173,8 @@ def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sampl
     return
     
 if __name__ == '__main__':
+    k = 2.0
+    p = 6
     # Configure data loader
     rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/' # replace with your dataset path need abs path
     #rooms_path = '/home/tony_chen_x19/dataset/'
@@ -209,6 +211,7 @@ if __name__ == '__main__':
     #  Training
     # ----------
     batches_done = 0
+    BCE_logitLoss = nn.BCEWithLogitsLoss()
     for epoch in range(opt.n_epochs):
         for i, batch in enumerate(fp_loader):
             # Unpack batch
@@ -257,6 +260,7 @@ if __name__ == '__main__':
                                             indices)
             else:
                 real_validity = discriminator(real_mks, given_nds, given_eds, nd_to_sample)
+                #[32, 1]
             # y=A(x), z=B(y) 求B中参数的梯度，不求A中参数的梯度
             # # 第一种方法
             # y = A(v1)
@@ -273,8 +277,6 @@ if __name__ == '__main__':
                 fake_validity = discriminator(gen_mks.detach(), given_nds.detach(), \
                                             given_eds.detach(), nd_to_sample.detach())
 
-            k = 2
-            p = 6
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
                 div_loss = compute_div_loss(discriminator, real_mks.data, \
@@ -290,13 +292,29 @@ if __name__ == '__main__':
             #                                             gen_mks.data, given_nds.data, \
             #                                             given_eds.data, nd_to_sample.data, \
             #                                             None, None)
-            real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = compute_iou_norm(real_mks.data, \
-                                                            gen_mks.data, given_nds.data, \
+            #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
+            fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm(real_mks.data, \
+                                                            gen_mks.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done))
+            fake_pos_giou = [] #iou:0,giou:1
+            real_pos_giou = []
+            for giou_k,v in fake_iou_pos.items():
+                fake_pos_giou.append(v[1])
+                real_pos_giou.append(real_iou_pos[giou_k][1])
+            fake_neg_giou = [] #iou:0,giou:1
+            real_neg_giou = []
+            for giou_k,v in fake_iou_neg.items():
+                fake_neg_giou.append(v[1])
+                real_neg_giou.append(real_iou_neg[giou_k][1])
             
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) \
-                    + k*div_loss
+            #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
+            all_giou_loss = BCE_logitLoss(Tensor(fake_pos_giou+fake_neg_giou),Tensor(real_pos_giou+real_neg_giou))
+            pos_giou_loss = BCE_logitLoss(Tensor(fake_pos_giou),Tensor(real_pos_giou))
+            neg_giou_loss = BCE_logitLoss(Tensor(fake_neg_giou),Tensor(real_neg_giou))
+            if len(real_iou_invalid) == 0:
+                print(1)
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + k*div_loss
 
             # Update discriminator
             d_loss.backward()
@@ -326,14 +344,16 @@ if __name__ == '__main__':
                                                 indices)
                 else:
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
-                    
+                    #[32, 1]
+
                 # Update generator
-                g_loss = -torch.mean(fake_validity)
+                g_loss = -torch.mean(fake_validity) + 10 * all_giou_loss
+                
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [r_iou_loss:%f] [f_iou_loss:%f] [r_giou_loss:%f] [f_giou_loss:%f]"
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [pos_giou_loss:%f] [neg_giou_loss:%f] [all_giou_loss:%f] "
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,pos_giou_loss,neg_giou_loss,all_giou_loss))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:

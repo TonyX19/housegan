@@ -87,6 +87,59 @@ def compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake'
 
     return iou_list
 
+def compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,tag='fake',im_size=256):
+    maps_batch = x_fake.detach().cpu().numpy()
+    edges_batch = given_w.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    np.seterr(divide='ignore',invalid='ignore')
+    pos = 0
+    iou_pos = {}
+    iou_neg = {}
+    iou_invalid = {}
+    iou_dict = {}
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        inds_ed = np.where(ed_to_sample==b)
+        
+        mks = maps_batch[inds_nd]
+        eds = edges_batch[inds_ed]
+
+        rooms_axes = []
+        for mk in mks:
+            r =  im_size/mk.shape[-1]
+            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
+            rooms_axes.append([x0, y0, x1, y1])
+          
+        rooms_cnt = len(rooms_axes)
+
+        for i in range(rooms_cnt):
+            axes = rooms_axes[i]
+            j = i+1
+            for j in range(j,rooms_cnt):
+                room_cmp = rooms_axes[j]
+                axes_c = room_cmp
+                a_box = list(axes)
+                b_box = list(axes_c)
+                iou,giou = GIOU(np.array([a_box]),np.array([b_box]))
+                key = str(i+pos)+'_'+str(j+pos)
+                iou_dict[key] =  [iou[0][0],giou[0][0]]
+
+        for ed in eds:
+            s,w,d = ed
+            key = str(s) + '_' + str(d)
+            if w == 1:
+                iou_pos[key] = iou_dict[key]
+            else:
+                iou_neg[key] = iou_dict[key]
+        
+        for k,v in iou_dict.items():
+            if k in iou_pos.keys() or k in iou_neg.keys():
+                continue;
+            iou_invalid[k] = v
+        pos += rooms_cnt
+
+    return iou_pos,iou_neg,iou_invalid
+
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
     real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
@@ -98,18 +151,18 @@ def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sa
 
     return iou_norm,giou_norm
 
-def compute_iou_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
-    fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
-    real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
-
-    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+def compute_iou_norm(x_real,x_fake,given_w,nd_to_sample,ed_to_sample,serial='1'):
+    fake_iou_pos,fake_iou_neg,fake_iou_invalid = compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,'fake')
+    real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_list_v1(x_real,given_w,nd_to_sample,ed_to_sample,'real')
     
-    real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:,0], ord=1)  
-    fake_iou_norm = np.linalg.norm(np.array(fake_iou_list)[:,0], ord=1)  
-    real_giou_norm = np.linalg.norm(np.array(real_iou_list)[:,1], ord=1) 
-    fake_giou_norm = np.linalg.norm(np.array(fake_iou_list)[:,1], ord=1) 
-
-    return real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm
+    # iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
+    
+    # real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:,0], ord=1)  
+    # fake_iou_norm = np.linalg.norm(np.array(fake_iou_list)[:,0], ord=1)  
+    # real_giou_norm = np.linalg.norm(np.array(real_iou_list)[:,1], ord=1) 
+    # fake_giou_norm = np.linalg.norm(np.array(fake_iou_list)[:,1], ord=1) 
+    
+    return fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid
 
 def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
