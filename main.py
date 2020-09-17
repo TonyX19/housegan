@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_iou_norm
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_iou_norm,compute_area_list
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -279,24 +279,29 @@ if __name__ == '__main__':
 
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                div_loss = compute_div_loss(discriminator, real_mks.data, \
-                                                            gen_mks.data, given_nds.data, \
-                                                            given_eds.data, nd_to_sample.data,\
-                                                             ed_to_sample.data,str(batches_done),data_parallel,p=p)
+                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                                            gen_mks.data, given_nds.data, \
+                                            given_eds.data, nd_to_sample.data,\
+                                            data_parallel, ed_to_sample.data)
+                # div_loss = compute_div_loss(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data,\
+                #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                div_loss = compute_div_loss(discriminator, real_mks.data, \
+                # div_loss = compute_div_loss(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data, \
+                #                                             ed_to_sample.data,str(batches_done),None,p=p)
+                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            ed_to_sample.data,str(batches_done),None,p=p)
-            # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-            #                                             gen_mks.data, given_nds.data, \
-            #                                             given_eds.data, nd_to_sample.data, \
-            #                                             None, None)
+                                                            None, None)
             #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
             fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm(real_mks.data, \
                                                             gen_mks.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done))
+            #compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
             fake_pos_giou = [] #iou:0,giou:1
             real_pos_giou = []
             for giou_k,v in fake_iou_pos.items():
@@ -314,7 +319,8 @@ if __name__ == '__main__':
             neg_giou_loss = BCE_logitLoss(Tensor(fake_neg_giou),Tensor(real_neg_giou))
             if len(real_iou_invalid) == 0:
                 print(1)
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + k*div_loss
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
+            #+ k*div_loss
 
             # Update discriminator
             d_loss.backward()
@@ -352,8 +358,8 @@ if __name__ == '__main__':
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [div_loss:%f] [pos_giou_loss:%f] [neg_giou_loss:%f] [all_giou_loss:%f] "
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),div_loss,pos_giou_loss,neg_giou_loss,all_giou_loss))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [gp:%f] [pos_giou_loss:%f] [neg_giou_loss:%f] [all_giou_loss:%f] "
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty,pos_giou_loss,neg_giou_loss,all_giou_loss))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
