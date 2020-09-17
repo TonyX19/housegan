@@ -526,6 +526,25 @@ def mask_to_bb(mask):
     
     return [x0, y0, x1+1, y1+1]
 
+def axes_to_mask(z_axes,img_size=32):
+    z_axes = z_axes.detach() * img_size
+    dtype, device = z_axes.dtype, z_axes.device
+    z_mask = torch.zeros(z_axes.shape[0],img_size,img_size, dtype=dtype, device=device)
+
+    for i,v in enumerate(z_axes):
+      
+      x0,y0,x1,y1 = v
+      x_min = int(torch.min(x0,x1).detach().numpy())
+      x_max = int(torch.max(x0,x1).detach().numpy())
+      y_min = int(torch.min(y0,y1).detach().numpy())
+      y_max = int(torch.max(y0,y1).detach().numpy())
+
+      for j in range(x_min,x_max):
+        for k in range(y_min,y_max):
+          z_mask[i][j][k] = 1.0
+
+    return z_mask
+
 def extract_corners(bb1, bb2, im_size=256):
 
 	# initialize

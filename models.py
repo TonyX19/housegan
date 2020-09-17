@@ -16,13 +16,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
-from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU
+from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU,axes_to_mask
 import torch.nn.utils.spectral_norm as spectral_norm
 import logging
 import json
 import pickle
 import numpy as np
-
+ROOM_area_mean = []
 
 def add_pool(x, nd_to_sample):
     dtype, device = x.dtype, x.device
@@ -334,7 +334,7 @@ class CMP(nn.Module):
         pos_v_dst = torch.cat([edges[pos_inds[0], 2], edges[pos_inds[0], 0]]).long()
         logging.debug("CMP:pos_v_src:%s" % (str(pos_v_src.shape)))
         pos_vecs_src = feats[pos_v_src.contiguous()]
-        pos_v_dst = pos_v_dst.view(-1, 1, 1, 1).expand_as(pos_vecs_src).to(device)
+        pos_v_dst = pos_v_dst.view(-1,1, 1, 1).expand_as(pos_vecs_src).to(device)
         logging.debug("CMP:pos_v_dst:%s" % (str(pos_v_dst.shape)))
         logging.debug("CMP:pooled_v_pos:%s" % (str(pooled_v_pos.shape)))
         logging.debug("CMP:pos_vecs_src:%s" % (str(pos_vecs_src.shape)))
@@ -399,6 +399,8 @@ class CMP(nn.Module):
         #pooled_v_pos based on fake data，not reasonable
         enc_in = torch.cat([feats,pooled_v_pos,pooled_v_neg], 1)
         logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
+        #[243, 16, 32, 32] [243, 16, 32, 32] [243, 16, 32, 32]
+        logging.debug('CMP:encoder:%s' %(str(enc_in.shape)))
         out = self.encoder(enc_in)
         return out
     
@@ -406,7 +408,7 @@ class CMP(nn.Module):
 class Generator(nn.Module): ## extend nn.Module
     def __init__(self):
         super(Generator, self).__init__()
-        self.mapping = nn.Sequential(nn.Linear(138, 4))
+        self.mapping = nn.Sequential(nn.Linear(128, 4))
         self.init_size = 32 // 4
         self.l1 = nn.Sequential(nn.Linear(138, 16 * self.init_size ** 2))
         self.upsample_1 = nn.Sequential(*conv_block(16, 16, 4, 2, 1, act="leaky", upsample=True))
@@ -416,48 +418,96 @@ class Generator(nn.Module): ## extend nn.Module
         self.decoder = nn.Sequential(
             *conv_block(16, 256, 3, 1, 1, act="leaky"),
             *conv_block(256, 128, 3, 1, 1, act="leaky"),    
-            *conv_block(128, 1, 3, 1, 1, act="tanh"))                                        
+            *conv_block(128, 1, 3, 1, 1, act="tanh"))   
     
-    def forward(self, z, given_y=None, given_w=None,img_size=256):
+    def normalization(self,data):
+        _range = torch.max(data) - torch.min(data)
+        return (data - torch.min(data)) / _range
+    
+    def forward(self, z, given_y=None, given_w=None):
         logging.debug('gen z shape: %s' % (str(z.shape)))
+        #[255, 128]
         z = z.view(-1, 128)
         logging.debug('gen z shape: %s' % (str(z.shape)))
+        #[255, 128]
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
-        # include nodes
-        if True:
-            y = given_y.view(-1, 10)
-            z = torch.cat([z, y], 1)
-        logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
-        
-        z_axes = self.mapping(z) + 1 ##x0,y0,x1,y1 因为有<0 所以整体向正方向移动一个单位
-        logging.debug('after mapping: %s' % (str(z_axes.shape)))
+        #[255, 10]
+        #include nodes
+        # if True:
+        #     y = given_y.view(-1, 10)
+        #     z = torch.cat([z, y], 1)
+        # logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
+        #[255, 10] [255, 138]
+
+        z_axes = self.mapping(z)##x0,y0,x1,y1
+        z_axes[:,0] = self.normalization(z_axes[:,0])
+        z_axes[:,1] = self.normalization(z_axes[:,1])
+        z_axes[:,2] = self.normalization(z_axes[:,2])
+        z_axes[:,3] = self.normalization(z_axes[:,3])
+        z_axes = axes_to_mask(z_axes,32)
+        x = z_axes
+        ######################
+        # for i,v in enumerate(z_axes):
+        #     x0,y0,x1,y1 = v
+        #     x_range = torch.max(x0,x1) - torch.min(x0,x1)
+        #     _x0 = (x0 - torch.min(x0,x1)) / x_range
+        #     _x1 = (x1 - torch.min(x0,x1)) / x_range
+        #     print(x0 - torch.min(x0,x1))
+        #     print(x_range)
+        #     exit()
+        #     print(x0)
+        #     y_range = torch.max(y0,y1) - torch.min(y0,y1)
+        #     _y0 = (y0 - torch.min(y0,y1)) / y_range
+        #     _y1 = (y1 - torch.min(y0,y1)) / y_range
+        #     print(_x0)
+        #     z_axes[i][0] = _x0;
+        #     print(z_axes[i][0])
+        #     z_axes[i][1] = _y0;
+        #     z_axes[i][2] = _x1;
+        #     z_axes[i][3] = _y1;
+        ###################
+        #logging.debug('after mapping: %s' % (str(z_axes.shape)))
         #根据面积分布 随机放大 替换y
-        x = self.l1(z) 
-        logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
+        # x = self.l1(z) 
+        # logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
+        # #[255, 1024] #[1042, 3]
         x = x.view(-1, 16, self.init_size, self.init_size)
+        print(len(x[x>0]))
         logging.debug("gen x.shape %s " % (str(x.shape)))
+        #[255, 16, 8, 8]
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
+        print(len(x[x>0]))
         #np.save('./tracking/x_cmp1_pi.npy',x.detach().numpy())
-        logging.debug("gen x.shape %s " % (str(x.shape)))
+        logging.debug("cmp1 x.shape %s " % (str(x.shape)))
+        #[255, 16, 16, 16]
         x = self.upsample_1(x)
+        print(len(x[x>0]))
         #np.save('./tracking/x_up_sample_pi.npy',x.detach().numpy())
         x = self.cmp_2(x, given_w).view(-1, *x.shape[1:])   
+        print(len(x[x>0]))
         #np.save('./tracking/x_cmp2_pi.npy',x.detach().numpy())
-        logging.debug("gen x.shape %s " % (str(x.shape)))
+        logging.debug("cmp2 x.shape %s " % (str(x.shape)))
+        #[255, 16, 16, 16]
         x = self.upsample_2(x)
+        print(len(x[x>0]))
+        logging.debug("up2 x.shape %s " % (str(x.shape)))
         #np.save('./tracking/x_up2_sample_pi.npy',x.detach().numpy())
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
+        print(len(x[x>0]))
+        logging.debug("decoder x.shape %s " % (str(x.shape)))
         #np.save('./tracking/x_decoder_sample_pi.npy',x.detach().numpy())
         x = x.view(-1, *x.shape[2:])    
+        print(len(x[x>0]))
         #np.save('./tracking/x_output_sample_pi.npy',x.detach().numpy())
         logging.debug("x shape: %s" % (str(x.shape)))
+        #[255, 32, 32]
         return x
 
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.encoder = nn.Sequential(
-            *conv_block(9, 16, 3, 1, 1, act="leaky"),
+            *conv_block(1, 16, 3, 1, 1, act="leaky"),
             *conv_block(16, 16, 3, 1, 1, act="leaky"),
             *conv_block(16, 16, 3, 1, 1, act="leaky"))
         self.l1 = nn.Sequential(nn.Linear(10, 8 * 32 ** 2))
@@ -480,17 +530,25 @@ class Discriminator(nn.Module):
         x = x.view(-1, 1, 32, 32)
         logging.debug('dis x shape: %s' % (str(x.shape)))
         logging.debug('given_y.shape: %s' % (str(given_y.shape)))
-        # include nodes
-        if True:
-            y = self.l1(given_y)
-            y = y.view(-1, 8, 32, 32)
-            x = torch.cat([x, y], 1)
+        ##include nodes
+        # if True:
+        #     y = self.l1(given_y)
+        #     y = y.view(-1, 8, 32, 32)
+        #     #[258, 8, 32, 32]
+        #     x = torch.cat([x, y], 1)
+        #logging.debug('y.shape: %s' % (str(y.shape)))
         x = self.encoder(x)
+        logging.debug('encoder: x shape: %s' % (str(x.shape)))
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])  
+        logging.debug('cmp1: x shape: %s' % (str(x.shape)))
         x = self.downsample_1(x)
+        logging.debug('down1: x shape: %s' % (str(x.shape)))
         x = self.cmp_2(x, given_w).view(-1, *x.shape[1:])
+        logging.debug('cmp2: x shape: %s' % (str(x.shape)))
         x = self.downsample_2(x)
+        logging.debug('down2: x shape: %s' % (str(x.shape)))
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
+        logging.debug('decoder: x shape: %s' % (str(x.shape)))
         x = x.view(-1, x.shape[1])
         
         # global loss
