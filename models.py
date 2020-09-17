@@ -429,9 +429,9 @@ class Generator(nn.Module): ## extend nn.Module
             z = torch.cat([z, y], 1)
         logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
         
-        z_axes = self.mapping(z) + img_size ##x0,y0,x1,y1
+        z_axes = self.mapping(z) + 1 ##x0,y0,x1,y1 因为有<0 所以整体向正方向移动一个单位
         logging.debug('after mapping: %s' % (str(z_axes.shape)))
-
+        #根据面积分布 随机放大 替换y
         x = self.l1(z) 
         logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
         x = x.view(-1, 16, self.init_size, self.init_size)
