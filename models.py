@@ -140,6 +140,27 @@ def compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,tag='fake',im_s
 
     return iou_pos,iou_neg,iou_invalid
 
+def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
+    maps_batch = x_fake.detach().cpu().numpy()
+    nodes_batch = given_y.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    rooms_areas = {}
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        
+        mks = maps_batch[inds_nd]
+        nds = nodes_batch[inds_nd]
+        for mk, nd in zip(mks, nds):
+            room_type = str(np.where(nd>0)[0][0])
+            r =  im_size/mk.shape[-1]
+            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
+            area = (x1 -x0) * (y1 -y0)
+            if room_type not in rooms_areas.keys():
+                rooms_areas[room_type] = [area]
+            rooms_areas[room_type].append(area)
+    print(rooms_areas)
+    return rooms_areas
+
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
     real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
@@ -154,7 +175,6 @@ def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sa
 def compute_iou_norm(x_real,x_fake,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_pos,fake_iou_neg,fake_iou_invalid = compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,'fake')
     real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_list_v1(x_real,given_w,nd_to_sample,ed_to_sample,'real')
-    
     # iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
     
     # real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:,0], ord=1)  
