@@ -21,16 +21,24 @@ import torch.nn.utils.spectral_norm as spectral_norm
 import logging
 import json
 import pickle
+import numpy as np
 
 
 def add_pool(x, nd_to_sample):
     dtype, device = x.dtype, x.device
     batch_size = torch.max(nd_to_sample) + 1
     pooled_x = torch.zeros(batch_size, x.shape[-1]).float().to(device)
-    pool_to = nd_to_sample.view(-1, 1).expand_as(x).to(device)
-    logging.debug("pool_to.shape %s " % (str(pool_to.shape)))
+    #[32, 128]
     logging.debug("x.shape %s " % (str(x.shape)))
+    #[259, 128]
+    #nd_to_sample [ 0,  0,  0,  0,  0,  1,  1,  1,  1,...]
+    pool_to = nd_to_sample.view(-1, 1).expand_as(x).to(device)
+    #[[ 0,  0,  0,  ...,  0,  0,  0],[ 0,  0,  0,  ...,  0,  0,  0]....[31, 31, 31,  ..., 31, 31, 31]]
+    logging.debug("pool_to.shape %s " % (str(pool_to.shape)))
+    #[259, 128]
     pooled_x = pooled_x.scatter_add(0, pool_to, x)
+    #[32, 128]
+    #259 nodes coverage to 32 graphs
     logging.debug("pooled_x.shape %s " % (str(pooled_x.shape)))
     return pooled_x
 
@@ -246,8 +254,8 @@ class CMP(nn.Module):
         super(CMP, self).__init__()
         self.in_channels = in_channels
         self.encoder = nn.Sequential(
+            *conv_block(3*in_channels, 2*in_channels, 3, 1, 1, act="leaky"),
             *conv_block(2*in_channels, 1*in_channels, 3, 1, 1, act="leaky"),
-            *conv_block(1*in_channels, 1*in_channels, 3, 1, 1, act="leaky"),
             *conv_block(1*in_channels, in_channels, 3, 1, 1, act="leaky"))
              
     # def forward(self, feats, edges=None):
@@ -389,7 +397,7 @@ class CMP(nn.Module):
 
         #feats + pooled_v_pos
         #pooled_v_pos based on fake data，not reasonable
-        enc_in = torch.cat([feats,pooled_intersec_vectors], 1)
+        enc_in = torch.cat([feats,pooled_v_pos,pooled_v_neg], 1)
         logging.debug("CMP:fea:%s,pooled_v_pos:%s,pooled_v_neg%s" % (str(feats.shape),str(pooled_v_pos.shape),str(pooled_v_neg.shape)))
         out = self.encoder(enc_in)
         return out
@@ -398,6 +406,7 @@ class CMP(nn.Module):
 class Generator(nn.Module): ## extend nn.Module
     def __init__(self):
         super(Generator, self).__init__()
+        self.mapping = nn.Sequential(nn.Linear(138, 4))
         self.init_size = 32 // 4
         self.l1 = nn.Sequential(nn.Linear(138, 16 * self.init_size ** 2))
         self.upsample_1 = nn.Sequential(*conv_block(16, 16, 4, 2, 1, act="leaky", upsample=True))
@@ -409,7 +418,7 @@ class Generator(nn.Module): ## extend nn.Module
             *conv_block(256, 128, 3, 1, 1, act="leaky"),    
             *conv_block(128, 1, 3, 1, 1, act="tanh"))                                        
     
-    def forward(self, z, given_y=None, given_w=None):
+    def forward(self, z, given_y=None, given_w=None,img_size=256):
         logging.debug('gen z shape: %s' % (str(z.shape)))
         z = z.view(-1, 128)
         logging.debug('gen z shape: %s' % (str(z.shape)))
@@ -419,19 +428,28 @@ class Generator(nn.Module): ## extend nn.Module
             y = given_y.view(-1, 10)
             z = torch.cat([z, y], 1)
         logging.debug("gen y %s ,z shape %s" % (str(y.shape),str(z.shape)))
+        
+        z_axes = self.mapping(z) + img_size ##x0,y0,x1,y1
+        logging.debug('after mapping: %s' % (str(z_axes.shape)))
 
-        x = self.l1(z)    
+        x = self.l1(z) 
         logging.debug("gen a_l1:x:%s w:%s" % (str(x.shape),str(given_w.shape)))  
         x = x.view(-1, 16, self.init_size, self.init_size)
         logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.cmp_1(x, given_w).view(-1, *x.shape[1:])
+        #np.save('./tracking/x_cmp1_pi.npy',x.detach().numpy())
         logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.upsample_1(x)
+        #np.save('./tracking/x_up_sample_pi.npy',x.detach().numpy())
         x = self.cmp_2(x, given_w).view(-1, *x.shape[1:])   
+        #np.save('./tracking/x_cmp2_pi.npy',x.detach().numpy())
         logging.debug("gen x.shape %s " % (str(x.shape)))
         x = self.upsample_2(x)
+        #np.save('./tracking/x_up2_sample_pi.npy',x.detach().numpy())
         x = self.decoder(x.view(-1, x.shape[1], *x.shape[2:]))
+        #np.save('./tracking/x_decoder_sample_pi.npy',x.detach().numpy())
         x = x.view(-1, *x.shape[2:])    
+        #np.save('./tracking/x_output_sample_pi.npy',x.detach().numpy())
         logging.debug("x shape: %s" % (str(x.shape)))
         return x
 
@@ -476,8 +494,11 @@ class Discriminator(nn.Module):
         x = x.view(-1, x.shape[1])
         
         # global loss
+        logging.debug('x.shape: %s' % (str(x.shape)))
         x_g = add_pool(x, nd_to_sample)
+        logging.debug('x_g.shape: %s' % (str(x_g.shape)))
         validity_global = self.fc_layer_global(x_g)
+        logging.debug('validity_global.shape: %s' % (str(validity_global.shape)))
 
         # local loss
         if False:
