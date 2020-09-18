@@ -1190,8 +1190,14 @@ def GIOU_v1 (center_box , margin_box ):
     union = area1 + area2 - inter_areas  #两框的总面积   利用广播机制
     ious = inter_areas / union
     gious = ious - (outer_areas - union)/outer_areas # IOU - ((C\union）/C)
+    if area1 == 0:
+      area1 = 0.1
     iou_v1_1 = inter_areas/area1
-    iou_v1_2 = inter_areas/area2
+    
+    if area2 == 0:
+      area2 = 0.1
+    else:
+      iou_v1_2 = inter_areas/area2
     # print("ious :",ious)
     # print("gious" ,gious)
     IOU = ious
