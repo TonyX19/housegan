@@ -1196,8 +1196,7 @@ def GIOU_v1 (center_box , margin_box ):
     
     if area2 == 0:
       area2 = 0.1
-    else:
-      iou_v1_2 = inter_areas/area2
+    iou_v1_2 = inter_areas/area2
     # print("ious :",ious)
     # print("gious" ,gious)
     IOU = ious
