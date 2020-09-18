@@ -140,26 +140,162 @@ def compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,tag='fake',im_s
 
     return iou_pos,iou_neg,iou_invalid
 
+def GIOU_v2 (center_box , margin_box ):
+    "calculate GIOU  "
+    '''
+    boxes1 shape : shape (n, 4)
+    [extracted_rooms[6][1]]
+    boxes2 shape : shape (k, 4)
+    [extracted_rooms[5][1]]
+    gious: shape (n, k)       
+    '''
+    x1,y1,x2,y2,mask1 = center_box
+    xx1,yy1,xx2,yy2,mask2 = margin_box
+
+    #area1 = (x2 -x1) * (y2 -y1)  #求取框的面积\
+    area1 = compute_area(mask1,[x1,y1,x2,y2])
+    area2 = compute_area(mask2,[xx1,yy1,xx2,yy2])
+    
+    if area1 == area2 == 0.:
+        n_v = mask1.clone()[0][0]*0+ torch.tensor(1.) 
+        return n_v,n_v,n_v,n_v
+        
+
+    inter_max_x = np.minimum(x2, xx2)   #求取重合的坐标及面积
+    inter_max_y = np.minimum(y2, yy2)
+    inter_min_x = np.maximum(x1, xx1)
+    inter_min_y = np.maximum(y1, yy1)
+    # inter_w = np.maximum(0 ,inter_max_x-inter_min_x)
+    # inter_h = np.maximum(0 ,inter_max_y-inter_min_y)
+
+    #inter_areas = inter_w * inter_h
+    inter_areas = compute_area(mask1,[inter_min_x,inter_min_y,inter_max_x,inter_max_y])
+   #print(inter_w , inter_h)
+    out_max_x = np.maximum(x2, xx2)  #求取包裹两个框的集合C的坐标及面积
+    out_max_y = np.maximum(y2, yy2)
+    out_min_x = np.minimum(x1, xx1)
+    out_min_y = np.minimum(y1, yy1)
+    # out_w = np.maximum(0, out_max_x - out_min_x)
+    # out_h = np.maximum(0, out_max_y - out_min_y)
+
+    #outer_areas = out_w * out_h
+    outer_areas = compute_area(mask1,[out_min_x,out_min_y,out_max_x,out_max_y])
+    union = area1 + area2 - inter_areas  #两框的总面积   利用广播机制
+    ious = inter_areas / union
+    gious = ious - (outer_areas - union)/outer_areas # IOU - ((C\union）/C)
+    
+    if area1 == 0.:
+      area1 = mask1.clone()[0][0]*0+ torch.tensor(0.1) 
+    iou_v1_1 = inter_areas/area1
+    
+    if area2 == 0:
+      area2 = mask1.clone()[0][0]*0+ torch.tensor(0.1) 
+    iou_v1_2 = inter_areas/area2
+    # print("ious :",ious)
+    # print("gious" ,gious)
+    IOU = ious
+    GIOU = gious
+    center_inter = iou_v1_1
+    margin_inter = iou_v1_2
+
+    return IOU ,GIOU ,center_inter ,margin_inter
+
+
+def compute_iou_list_v2(x_fake,given_w,nd_to_sample,ed_to_sample,tag='fake',im_size=256):
+    maps_batch = x_fake.detach().cpu().numpy()
+    edges_batch = given_w.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    np.seterr(divide='ignore',invalid='ignore')
+    pos = 0
+    iou_pos = {}
+    iou_neg = {}
+    iou_invalid = {}
+    iou_dict = {}
+    i = 0
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        inds_ed = np.where(ed_to_sample==b)
+        mks = maps_batch[inds_nd]
+        eds = edges_batch[inds_ed]
+
+        rooms_axes = []
+        for mk in mks:
+            x0, y0, x1, y1 = mask_to_bb(mk)
+            rooms_axes.append([x0, y0, x1, y1,x_fake[i]])
+          
+        rooms_cnt = len(rooms_axes)
+
+        for i in range(rooms_cnt):
+            axes = rooms_axes[i]
+            j = i+1
+            for j in range(j,rooms_cnt):
+                room_cmp = rooms_axes[j]
+                axes_c = room_cmp
+                iou ,giou ,center_inter ,margin_inter = GIOU_v2(axes,axes_c)
+                key = str(i+pos)+'_'+str(j+pos)
+                iou_dict[key] =  [iou,giou,center_inter ,margin_inter]
+
+        for ed in eds:
+            s,w,d = ed
+            key = str(s) + '_' + str(d)
+            if w == 1:
+                iou_pos[key] = iou_dict[key]
+            else:
+                iou_neg[key] = iou_dict[key]
+        i +=1
+        for k,v in iou_dict.items():
+            if k in iou_pos.keys() or k in iou_neg.keys():
+                continue;
+            iou_invalid[k] = v
+        pos += rooms_cnt
+
+
+    return iou_pos,iou_neg,iou_invalid
+
+
 def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
     maps_batch = x_fake.detach().cpu().numpy()
     nodes_batch = given_y.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
     rooms_areas = {}
     for b in range(batch_size):
-        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
-        
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置 
         mks = maps_batch[inds_nd]
         nds = nodes_batch[inds_nd]
+        i = 0
         for mk, nd in zip(mks, nds):
             room_type = str(np.where(nd>0)[0][0])
-            r =  im_size/mk.shape[-1]
-            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
-            area_rate = ((x1 -x0) * (y1 -y0)) / (im_size*im_size)
+            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) 
+            area = compute_area(x_fake[inds_nd][i],[x0, y0, x1-1, y1-1])
+            # if area > 0 :
+            #     print([x0, y0, x1-1, y1-1])
+            #     np.save("./tracking/debug_fake.npy",x_fake[inds_nd][i].detach().numpy())
+            #     exit()
+            if area < 0:
+                area = abs(area * 0)
+            area_rate = area / (mk.shape[-1]*mk.shape[-1])
+            
+            i+=1
             if room_type not in rooms_areas.keys():
                 rooms_areas[room_type] = [area_rate]
                 continue;
             rooms_areas[room_type].append(area_rate)
     return rooms_areas
+
+def compute_area(mask,axes):
+    #mask [32,32]
+    x0, y0, x1, y1 = axes
+    x0, y0, x1, y1 = int(x0),int(y0),int(x1),int(y1)
+
+    device = mask.device
+    area_v = torch.tensor(0.).to(device) #init
+    for y_idx in range(y0,y1):
+        for x_idx in range(x0,x1):
+            area_v += mask[y_idx][x_idx]
+    if area_v == 0.:
+        area_v += mask[0][0] * 0.
+
+    return area_v
 
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
@@ -173,8 +309,8 @@ def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sa
     return iou_norm,giou_norm
 
 def compute_iou_norm(x_real,x_fake,given_w,nd_to_sample,ed_to_sample,serial='1'):
-    fake_iou_pos,fake_iou_neg,fake_iou_invalid = compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,'fake')
-    real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_list_v1(x_real,given_w,nd_to_sample,ed_to_sample,'real')
+    fake_iou_pos,fake_iou_neg,fake_iou_invalid = compute_iou_list_v2(x_fake,given_w,nd_to_sample,ed_to_sample,'fake')
+    real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_list_v2(x_real,given_w.data,nd_to_sample.data,ed_to_sample.data,'real')
     # iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
     
     # real_iou_norm = np.linalg.norm(np.array(real_iou_list)[:,0], ord=1)  
@@ -429,7 +565,10 @@ class Discriminator(nn.Module):
         x = x.view(-1, x.shape[1])
         
         # global loss
-        x_g = add_pool(x, nd_to_sample)
+        x_g = add_pool(x, nd_to_sample) 
+        #print(x.shape,x_g.shape,nd_to_sample.shape)
+        # torch.Size([244, 128]) torch.Size([32, 128]) torch.Size([244])
+        # nd_to_sample 1-d 节点对应序号
         validity_global = self.fc_layer_global(x_g)
 
         # local loss
