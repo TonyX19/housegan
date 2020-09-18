@@ -333,43 +333,6 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
 ###########################new loss################
-                #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
-                fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm(real_mks.data, \
-                                                                gen_mks, \
-                                                                given_eds, nd_to_sample, \
-                                                                ed_to_sample,str(batches_done))
-
-                fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
-                real_pos_giou = []
-                fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
-                real_pos_ci = []
-                for giou_k,v in fake_iou_pos.items():
-                    fake_pos_giou.append(v[1])
-                    real_pos_giou.append(real_iou_pos[giou_k][1])
-                    fake_pos_ci.append(v[2])
-                    real_pos_ci.append(real_iou_pos[giou_k][2])
-
-                fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
-                real_neg_giou = []
-                for giou_k,v in fake_iou_neg.items():
-                    fake_neg_giou.append(v[1])
-                    real_neg_giou.append(real_iou_neg[giou_k][1])
-                # print(fake_pos_giou)
-                # print(fake_neg_giou)
-                # print(real_pos_giou)
-                # print(real_neg_giou)
-                # print(fake_pos_ci)
-                # print(real_pos_ci)
-                #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
-                #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
-                all_giou_loss = BCE_loss(sig(Tensor(fake_pos_giou+fake_neg_giou)),sig(Tensor(real_pos_giou+real_neg_giou)))
-                pos_giou_loss = BCE_loss(sig(Tensor(fake_pos_giou)),sig(Tensor(real_pos_giou)))
-                neg_giou_loss = BCE_loss(sig(Tensor(fake_neg_giou)),sig(Tensor(real_neg_giou)))
-                pos_ci_loss = BCE_loss(Tensor(fake_pos_ci),Tensor(real_pos_ci))
-
-                if len(real_iou_invalid) == 0:
-                    print(1)
-                
                 real_area = compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
                 fake_area = compute_area_list(gen_mks, given_nds, nd_to_sample)
                 area_loss_dict = {}
@@ -385,7 +348,7 @@ if __name__ == '__main__':
                 all_areas_loss = sum(area_loss_dict.values())
 ###########################
                 # Update generator
-                g_loss = -torch.mean(fake_validity) + 6 * pos_ci_loss + 6 * neg_giou_loss + all_areas_loss
+                g_loss = -torch.mean(fake_validity)  + all_areas_loss
                 g_loss.backward()
                 # for name, parms in generator.named_parameters():	
                 #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
@@ -394,10 +357,10 @@ if __name__ == '__main__':
 
                 print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] \
                         [D loss: %f] [G loss: %f] [gp:%f] \
-                        [pos_giou_loss:%f] [neg_giou_loss:%f] [all_giou_loss:%f] [pos_ci_loss:%f] [area_loss:%s] [area_detail:%s]"
+                        [area_loss:%s] [area_detail:%s]"
                     % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, \
                         d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                            ,pos_giou_loss,neg_giou_loss,all_giou_loss,pos_ci_loss,str(all_areas_loss),str(area_loss_dict)))
+                            ,str(all_areas_loss),str(area_loss_dict)))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
