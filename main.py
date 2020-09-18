@@ -212,6 +212,9 @@ if __name__ == '__main__':
     # ----------
     batches_done = 0
     BCE_logitLoss = nn.BCEWithLogitsLoss()
+    BCE_loss = nn.BCELoss()
+    MSE_loss = torch.nn.MSELoss(reduction='mean')
+    sig = nn.Sigmoid()
     for epoch in range(opt.n_epochs):
         for i, batch in enumerate(fp_loader):
             # Unpack batch
@@ -301,24 +304,42 @@ if __name__ == '__main__':
                                                             gen_mks.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done))
-            #compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
-            fake_pos_giou = [] #iou:0,giou:1
+
+            fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
             real_pos_giou = []
+            fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
+            real_pos_ci = []
             for giou_k,v in fake_iou_pos.items():
                 fake_pos_giou.append(v[1])
                 real_pos_giou.append(real_iou_pos[giou_k][1])
-            fake_neg_giou = [] #iou:0,giou:1
+                fake_pos_ci.append(v[2])
+                real_pos_ci.append(real_iou_pos[giou_k][2])
+
+            fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
             real_neg_giou = []
             for giou_k,v in fake_iou_neg.items():
                 fake_neg_giou.append(v[1])
                 real_neg_giou.append(real_iou_neg[giou_k][1])
-            
+
+            #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
             #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
-            all_giou_loss = BCE_logitLoss(Tensor(fake_pos_giou+fake_neg_giou),Tensor(real_pos_giou+real_neg_giou))
-            pos_giou_loss = BCE_logitLoss(Tensor(fake_pos_giou),Tensor(real_pos_giou))
-            neg_giou_loss = BCE_logitLoss(Tensor(fake_neg_giou),Tensor(real_neg_giou))
+            all_giou_loss = BCE_loss(Tensor(fake_pos_giou+fake_neg_giou),Tensor(real_pos_giou+real_neg_giou))
+            pos_giou_loss = BCE_loss(Tensor(fake_pos_giou),Tensor(real_pos_giou))
+            neg_giou_loss = BCE_loss(Tensor(fake_neg_giou),Tensor(real_neg_giou))
+            pos_ci_loss = BCE_loss(Tensor(fake_pos_ci),Tensor(real_pos_ci))
+
             if len(real_iou_invalid) == 0:
                 print(1)
+            
+            real_area = compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
+            fake_area = compute_area_list(gen_mks.data, given_nds.data, nd_to_sample.data)
+            area_loss_dict = {}
+            for k,v in real_area.items():
+                area_loss = BCE_loss(Tensor(fake_area[k]),Tensor(v))
+                area_loss_dict[k] = area_loss
+
+            all_areas_loss = sum(area_loss_dict.values())
+
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
             #+ k*div_loss
 
@@ -353,13 +374,17 @@ if __name__ == '__main__':
                     #[32, 1]
 
                 # Update generator
-                g_loss = -torch.mean(fake_validity) + 10 * all_giou_loss
+                g_loss = -torch.mean(fake_validity) + 6 * pos_ci_loss + 6 * neg_giou_loss + all_areas_loss
                 
                 g_loss.backward()
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] [D loss: %f] [G loss: %f] [gp:%f] [pos_giou_loss:%f] [neg_giou_loss:%f] [all_giou_loss:%f] "
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty,pos_giou_loss,neg_giou_loss,all_giou_loss))
+                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] \
+                        [D loss: %f] [G loss: %f] [gp:%f] \
+                        [pos_giou_loss:%f] [neg_giou_loss:%f] [all_giou_loss:%f] [pos_ci_loss:%f] [area_loss:%s] [area_detail:%s]"
+                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, \
+                        d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                            ,pos_giou_loss,neg_giou_loss,all_giou_loss,pos_ci_loss,str(all_areas_loss),str(area_loss_dict)))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:

@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
-from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU
+from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU_v1
 import torch.nn.utils.spectral_norm as spectral_norm
 import logging
 import json
@@ -120,9 +120,9 @@ def compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,tag='fake',im_s
                 axes_c = room_cmp
                 a_box = list(axes)
                 b_box = list(axes_c)
-                iou,giou = GIOU(np.array([a_box]),np.array([b_box]))
+                iou ,giou ,center_inter ,margin_inter = GIOU_v1(a_box,b_box)
                 key = str(i+pos)+'_'+str(j+pos)
-                iou_dict[key] =  [iou[0][0],giou[0][0]]
+                iou_dict[key] =  [iou,giou,center_inter ,margin_inter]
 
         for ed in eds:
             s,w,d = ed
@@ -154,11 +154,11 @@ def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
             room_type = str(np.where(nd>0)[0][0])
             r =  im_size/mk.shape[-1]
             x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
-            area = (x1 -x0) * (y1 -y0)
+            area_rate = ((x1 -x0) * (y1 -y0)) / (im_size*im_size)
             if room_type not in rooms_areas.keys():
-                rooms_areas[room_type] = [area]
-            rooms_areas[room_type].append(area)
-    print(rooms_areas)
+                rooms_areas[room_type] = [area_rate]
+                continue;
+            rooms_areas[room_type].append(area_rate)
     return rooms_areas
 
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
@@ -218,7 +218,7 @@ def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
     gradient_penalty = ((grad.norm(2, 1).norm(2, 1) - 1) ** 2).mean()
     return gradient_penalty
 
-def compute_div_loss(D, real_x, fake_x,given_y=None, given_w=None, \
+def compute_div_loss_v1(D, real_x, fake_x,given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
                              serial='1',data_parallel=None, p=6):
     indices = nd_to_sample, ed_to_sample
@@ -250,7 +250,7 @@ def compute_div_loss(D, real_x, fake_x,given_y=None, given_w=None, \
     div = (grad.norm(2, dim=1) ** p).mean()
     return div
 
-def compute_div_loss_o(D, x, x_fake,given_y=None, given_w=None, \
+def compute_div_loss(D, x, x_fake,given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
                              serial='1',data_parallel=None, p=6):
     indices = nd_to_sample, ed_to_sample
