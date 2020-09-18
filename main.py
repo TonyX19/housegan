@@ -283,25 +283,16 @@ if __name__ == '__main__':
                                             gen_mks.data, given_nds.data, \
                                             given_eds.data, nd_to_sample.data,\
                                             data_parallel, ed_to_sample.data)
-                # div_loss = compute_div_loss(discriminator, real_mks.data, \
-                #                                             gen_mks.data, given_nds.data, \
-                #                                             given_eds.data, nd_to_sample.data,\
-                #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                # div_loss = compute_div_loss(discriminator, real_mks.data, \
-                #                                             gen_mks.data, given_nds.data, \
-                #                                             given_eds.data, nd_to_sample.data, \
-                #                                             ed_to_sample.data,str(batches_done),None,p=p)
                 gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             None, None)
-            #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
             fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm(real_mks.data, \
                                                             gen_mks.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             ed_to_sample.data,str(batches_done))
-            #compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
+
             fake_pos_giou = [] #iou:0,giou:1
             real_pos_giou = []
             for giou_k,v in fake_iou_pos.items():
@@ -313,14 +304,12 @@ if __name__ == '__main__':
                 fake_neg_giou.append(v[1])
                 real_neg_giou.append(real_iou_neg[giou_k][1])
             
-            #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
+           
             all_giou_loss = BCE_logitLoss(Tensor(fake_pos_giou+fake_neg_giou),Tensor(real_pos_giou+real_neg_giou))
             pos_giou_loss = BCE_logitLoss(Tensor(fake_pos_giou),Tensor(real_pos_giou))
             neg_giou_loss = BCE_logitLoss(Tensor(fake_neg_giou),Tensor(real_neg_giou))
-            if len(real_iou_invalid) == 0:
-                print(1)
+
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
-            #+ k*div_loss
 
             # Update discriminator
             d_loss.backward()
@@ -353,7 +342,7 @@ if __name__ == '__main__':
                     #[32, 1]
 
                 # Update generator
-                g_loss = -torch.mean(fake_validity) + 10 * all_giou_loss
+                g_loss = -torch.mean(fake_validity)
                 
                 g_loss.backward()
                 optimizer_G.step()
