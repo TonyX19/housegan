@@ -323,9 +323,9 @@ if __name__ == '__main__':
 
             #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
             #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
-            all_giou_loss = BCE_loss(Tensor(fake_pos_giou+fake_neg_giou),Tensor(real_pos_giou+real_neg_giou))
-            pos_giou_loss = BCE_loss(Tensor(fake_pos_giou),Tensor(real_pos_giou))
-            neg_giou_loss = BCE_loss(Tensor(fake_neg_giou),Tensor(real_neg_giou))
+            all_giou_loss = BCE_loss(sig(Tensor(fake_pos_giou+fake_neg_giou)),sig(Tensor(real_pos_giou+real_neg_giou)))
+            pos_giou_loss = BCE_loss(sig(Tensor(fake_pos_giou)),sig(Tensor(real_pos_giou)))
+            neg_giou_loss = BCE_loss(sig(Tensor(fake_neg_giou)),sig(Tensor(real_neg_giou)))
             pos_ci_loss = BCE_loss(Tensor(fake_pos_ci),Tensor(real_pos_ci))
 
             if len(real_iou_invalid) == 0:
