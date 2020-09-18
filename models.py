@@ -39,54 +39,6 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
-def compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,tag='fake',im_size=256):
-    maps_batch = x_fake.detach().cpu().numpy()
-    nodes_batch = given_y.detach().cpu().numpy()
-    edges_batch = given_w.detach().cpu().numpy()
-    batch_size = torch.max(nd_to_sample) + 1
-    np.seterr(divide='ignore',invalid='ignore')
-    extracted_room_stats = {}
-    for b in range(batch_size):
-        iou_list = []
-        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
-        inds_ed = np.where(ed_to_sample==b)
-        
-        mks = maps_batch[inds_nd]
-        nds = nodes_batch[inds_nd]
-        eds = edges_batch[inds_ed]
-        
-        comb_img = np.ones((im_size, im_size, 3)) * 255
-        extracted_rooms = []
-        for mk, nd in zip(mks, nds):
-            r =  im_size/mk.shape[-1]
-            x0, y0, x1, y1 = np.array(mask_to_bb(mk)) * r 
-            extracted_rooms.append([mk, (x0, y0, x1, y1), nd,eds])
-            
-        stats_key = tag +'_'+ str(b)
-        extracted_room_stats[stats_key] = [extracted_rooms]
-        extracted_rooms_len = len(extracted_rooms)  
-          
-        iou_dict = {}
-        iou_list = []
-        for i in range(extracted_rooms_len):
-            room = extracted_rooms[i]
-            mk, axes, nd,ed = room
-            j = i+1
-            for j in range(j,extracted_rooms_len):
-                room_cmp = extracted_rooms[j]
-                mk_c,axes_c, nd_c,ed_c = room_cmp
-                a_box = list(axes)
-                b_box = list(axes_c)
-                iou,Giou = GIOU(np.array([a_box]),np.array([b_box]))
-                key = str(i)+'_'+str(j)
-                iou_dict[key] =  [iou[0][0],Giou[0][0]]
-                iou_list.append(iou_dict[key])
-        extracted_room_stats[stats_key].append(iou_dict)
-
-    #np.save('./tracking/area_stats_'+serial+'_'+tag+'_pi.npy',extracted_room_stats)
-
-    return iou_list
-
 def compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,tag='fake',im_size=256):
     maps_batch = x_fake.detach().cpu().numpy()
     edges_batch = given_w.detach().cpu().numpy()
@@ -161,16 +113,6 @@ def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
     print(rooms_areas)
     return rooms_areas
 
-def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
-    fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
-    real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')
-
-    iou_diff = np.array(real_iou_list)-np.array(fake_iou_list)
-    
-    iou_norm = np.linalg.norm(iou_diff[:,0], ord=1)  
-    giou_norm = np.linalg.norm(iou_diff[:,1], ord=1) 
-
-    return iou_norm,giou_norm
 
 def compute_iou_norm(x_real,x_fake,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_pos,fake_iou_neg,fake_iou_invalid = compute_iou_list_v1(x_fake,given_w,nd_to_sample,ed_to_sample,'fake')
@@ -183,17 +125,6 @@ def compute_iou_norm(x_real,x_fake,given_w,nd_to_sample,ed_to_sample,serial='1')
     # fake_giou_norm = np.linalg.norm(np.array(fake_iou_list)[:,1], ord=1) 
     
     return fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid
-
-def compute_penalty(D, x, x_fake, given_y=None, given_w=None, \
-                             nd_to_sample=None, ed_to_sample=None, \
-                             serial='1',data_parallel=None):
-    gradient_penalty = compute_gradient_penalty(D, x, x_fake, given_y, given_w, \
-                             nd_to_sample, ed_to_sample, \
-                             data_parallel)
-    iou_norm,giou_norm = compute_iou_penalty_norm(x,x_fake, given_y, given_w, \
-                             nd_to_sample, ed_to_sample)
-                             
-    return gradient_penalty,iou_norm,giou_norm
 
 def compute_gradient_penalty(D, x, x_fake, given_y=None, given_w=None, \
                              nd_to_sample=None, ed_to_sample=None, \
