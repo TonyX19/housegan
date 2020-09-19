@@ -364,8 +364,8 @@ if __name__ == '__main__':
                 
                 def transfer_list_to_tensor(data):
                     target = torch.ones(len(data))
-                    for i,v in enumerate(data):
-                        target[i] = v.clone()
+                    for k_,v in enumerate(data):
+                        target[k_] = v.clone()
                     return target
                 
                 fake_pos_giou = transfer_list_to_tensor(fake_pos_giou)
@@ -401,9 +401,9 @@ if __name__ == '__main__':
                 for k,v in real_area.items():
                     target = torch.ones(len(real_area[k]))
                     input_ = torch.ones(len(real_area[k]))
-                    for i,v_ in enumerate(v):
-                        target[i] = v_
-                        input_[i] = fake_area[k][i]
+                    for k_,v_ in enumerate(v):
+                        target[k_] = v_
+                        input_[k_] = fake_area[k][i]
                     area_loss = BCE_loss(input_,target)
                     area_loss_dict[k] = area_loss
 
