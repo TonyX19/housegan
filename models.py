@@ -156,7 +156,7 @@ def GIOU_v2 (center_box , margin_box ):
     area1 = compute_area(mask1,[x1,y1,x2,y2])
     area2 = compute_area(mask2,[xx1,yy1,xx2,yy2])
     
-    if area1 == area2 == 0.:
+    if (area1 == 0.) and (area2 == 0.):
         #n_v = mask1.clone()[0][0]*0+ torch.tensor(1.) 
         n_v = torch.tensor(1.) #resource problem
         return n_v,n_v,n_v,n_v
@@ -339,7 +339,7 @@ def compute_area(mask,axes):
     area_v = torch.tensor(0.).to(device) #init
     for y_idx in range(y0,y1):
         for x_idx in range(x0,x1):
-            area_v += mask[y_idx][x_idx]
+            area_v = area_v + mask[y_idx][x_idx]
     
     if area_v < 0: #gen_mks 存在负矩阵 这时坐标返回[0,0,0,0] gen_mks[0,0,0,0]仍为负所以导致面积为负数
         return torch.tensor(0.)
