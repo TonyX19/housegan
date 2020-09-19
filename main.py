@@ -410,7 +410,9 @@ if __name__ == '__main__':
                 all_areas_loss = sum(area_loss_dict.values())
 ###########################
                 # Update generator
-                g_loss = -torch.mean(fake_validity) + 6 * pos_ci_loss + 6 * neg_giou_loss + all_areas_loss
+                g_loss = -torch.mean(fake_validity) 
+                if epoch > 2:
+                    g_loss += 6 * pos_ci_loss + 6 * neg_giou_loss + all_areas_loss
                 g_loss.backward()
                 # for name, parms in generator.named_parameters():	
                 #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
