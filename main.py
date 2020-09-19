@@ -221,7 +221,7 @@ if __name__ == '__main__':
     MSE_loss = torch.nn.MSELoss(reduction='mean')
     sig = nn.Sigmoid()
     for epoch in range(opt.n_epochs):
-        for i, batch in enumerate(fp_loader):
+        for b_idx, batch in enumerate(fp_loader):
             # Unpack batch
             mks, nds, eds, nd_to_sample, ed_to_sample = batch
             logging.debug("mks: %s nds:%s nd_to_sample:%s" % (str(mks.shape),str(nds.shape),str(nd_to_sample.shape)))
@@ -322,7 +322,7 @@ if __name__ == '__main__':
                 p.requires_grad = False
                 
             # Train the generator every n_critic steps
-            if i % opt.n_critic == 0:
+            if b_idx % opt.n_critic == 0:
                 
                 # Generate a batch of images
                 z = Variable(Tensor(np.random.normal(0, 1, tuple(z_shape))))
@@ -403,7 +403,7 @@ if __name__ == '__main__':
                     input_ = torch.ones(len(real_area[k]))
                     for k_,v_ in enumerate(v):
                         target[k_] = v_
-                        input_[k_] = fake_area[k][i]
+                        input_[k_] = fake_area[k][k_]
                     area_loss = BCE_loss(input_,target)
                     area_loss_dict[k] = area_loss
 
@@ -422,7 +422,7 @@ if __name__ == '__main__':
                     area_loss_dict[k] = float(v.detach().cpu().numpy())
 
                 print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[pos_giou_loss:%f]\t[neg_giou_loss:%f]\t[all_giou_loss:%f] "
-                    % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, \
+                    % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                         d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
                             ,float(all_areas_loss.detach().cpu().numpy()),str(all_areas_loss.grad_fn),str(area_loss_dict)\
                             ,float(pos_ci_loss.detach().cpu().numpy()),str(pos_ci_loss.grad_fn),float(pos_giou_loss.detach().cpu().numpy()),float(neg_giou_loss.detach().cpu().numpy()),float(all_giou_loss.detach().cpu().numpy())))
