@@ -292,9 +292,13 @@ def compute_area(mask,axes):
     for y_idx in range(y0,y1):
         for x_idx in range(x0,x1):
             area_v += mask[y_idx][x_idx]
-    #避免提前介入,面积为0 不backward()
+    
+    if area_v < 0: #gen_mks 存在负矩阵 这时坐标返回[0,0,0,0] gen_mks[0,0,0,0]仍为负所以导致面积为负数
+        return torch.tensor(0.)
+    #避免提前介入,面积为0 不backward
     # if area_v == 0.:
-    #     area_v += mask[0][0] * 0.
+    #     print("area_v is 0")
+        #area_v += mask[0][0] * 0.
 
     return area_v
 
