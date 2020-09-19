@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
-from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU_v1
+from utils import combine_images_maps, rectangle_renderer,BBox,mask_to_bb,GIOU_v1,transfer_list_to_tensor
 import torch.nn.utils.spectral_norm as spectral_norm
 import logging
 import json
@@ -282,6 +282,51 @@ def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
             rooms_areas[room_type].append(area_rate)
     return rooms_areas
 
+def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample):
+    real_area,real_shape = compute_area_list_v1(real_mask,given_y,nd_to_sample)
+    fake_area,fake_shape = compute_area_list_v1(fake_mask,given_y,nd_to_sample)
+    area_ret = {}
+    for fr_type,f_area_list in fake_area.items():
+        f_area_list = transfer_list_to_tensor(f_area_list)
+        r_area_list = transfer_list_to_tensor(real_area[fr_type])
+#         f_mean = f_area_list.mean()
+#         avg_bias = torch.tensor(real_shape[fr_type]) * (torch.tensor(1.0) - torch.tensor(fake_avg[fr_type]))
+#         l1_norm = (r_area_list - avg_bias - f_area_list).norm(p=1)#均值存在问题，就是0情况下 norm很小
+        #l1_shape_norm =  (torch.FloatTensor() - torch.FloatTensor(fake_shape[fr_type])).norm(p=1) #分散成度
+        l1_area_norm = ((r_area_list - f_area_list)/torch.FloatTensor(fake_shape[fr_type])).norm(p=1) #real 和 fake 面积同差除以real shape 就是不同面积在同等尺度上的比较避免了 fake散开的情况
+        #如果是real shape 没有意义 r_area_list 永远是1
+        area_ret[fr_type] = l1_area_norm
+
+    return area_ret
+
+
+def compute_area_list_v1(mask,given_y,nd_to_sample,im_size=256):
+    maps_batch = mask.detach().cpu().numpy()
+    nodes_batch = given_y.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    rooms_areas = {}
+    rooms_shape = {}
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置 
+        mks = maps_batch[inds_nd]
+        nds = nodes_batch[inds_nd]
+        i = 0
+        for nd in nds:
+            room_type = str(np.where(nd>0)[0][0])
+            pos = mask[inds_nd][i][mask[inds_nd][i] > 0]
+            area = torch.sum(pos)
+            _shape = mask[inds_nd][i][mask[inds_nd][i] > 0].size()[0]
+            if _shape == 0:
+                _shape = 1 #避免 real是 infinite
+            i+=1
+            if room_type not in rooms_areas.keys():
+                rooms_areas[room_type] = [area]
+                rooms_shape[room_type] = [_shape]
+                continue;
+            rooms_areas[room_type].append(area)
+            rooms_shape[room_type].append(_shape)
+    return rooms_areas,rooms_shape
+
 def compute_area(mask,axes):
     #mask [32,32]
     x0, y0, x1, y1 = axes
@@ -301,6 +346,39 @@ def compute_area(mask,axes):
         #area_v += mask[0][0] * 0.
 
     return area_v
+
+def compute_empty_area(mask,axes):
+    #mask [32,32]
+    x0, y0, x1, y1 = axes
+    x0, y0, x1, y1 = int(x0),int(y0),int(x1),int(y1)
+    
+    device = mask.device
+    area_v = torch.tensor(0.).to(device) #init
+    for y_idx in range(y0,y1):
+        for x_idx in range(x0,x1):
+            if mask[y_idx][x_idx] < 0:
+                area_v += mask[y_idx][x_idx]
+    
+    return area_v
+
+def compute_sparsity_penalty(masks,given_w,nd_to_sample):
+    maps_batch = masks.detach().cpu().numpy()
+    edges_batch = given_w.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    ret = []
+    mks_idx = 0
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        mks = maps_batch[inds_nd]
+
+        rooms_axes = []
+        for mk in mks:
+            x0, y0, x1, y1 = mask_to_bb(mk) 
+            empty_area = compute_empty_area(masks[mks_idx],[x0, y0, x1, y1])
+            mks_idx +=1
+            ret.append(empty_area)
+            
+    return transfer_list_to_tensor(ret).norm(p=1)
 
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
