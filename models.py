@@ -360,7 +360,7 @@ def compute_empty_area(mask,axes):
     for y_idx in range(y0,y1):
         for x_idx in range(x0,x1):
             if mask[y_idx][x_idx] < 0:
-                area_v += mask[y_idx][x_idx]
+                area_v = area_v + mask[y_idx][x_idx]
     
     return area_v
 
