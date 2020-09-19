@@ -157,7 +157,8 @@ def GIOU_v2 (center_box , margin_box ):
     area2 = compute_area(mask2,[xx1,yy1,xx2,yy2])
     
     if area1 == area2 == 0.:
-        n_v = mask1.clone()[0][0]*0+ torch.tensor(1.) 
+        #n_v = mask1.clone()[0][0]*0+ torch.tensor(1.) 
+        n_v = torch.tensor(1.) #resource problem
         return n_v,n_v,n_v,n_v
         
 
