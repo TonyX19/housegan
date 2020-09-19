@@ -386,7 +386,7 @@ if __name__ == '__main__':
                 all_areas_loss = sum(area_dict.values())         
 ##############################
                 # Update generator
-                g_loss = -torch.mean(fake_validity)  + all_areas_loss + 5 * sp + 6 * pos_ci_norm + 6 * neg_giou_norm
+                g_loss = -torch.mean(fake_validity)  + all_areas_loss + 5 * sp + pos_ci_norm + neg_giou_norm
                 g_loss.backward()
                 optimizer_G.step()
                 area_loss_dict = {}
