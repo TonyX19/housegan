@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_iou_norm,compute_area_list
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_iou_norm_v1,compute_area_list
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -131,7 +131,7 @@ def data_parallel(module, _input, indices):
 # discriminator.apply(weights_init_normal)
 
 # Visualize a single batch
-def visualizeSingleBatch(fp_loader_test, opt):
+def visualizeSingleBatch(fp_loader_test, opt,):
     with torch.no_grad():
         # Unpack batch
         mks, nds, eds, nd_to_sample, ed_to_sample = next(iter(fp_loader_test))
@@ -151,13 +151,15 @@ def visualizeSingleBatch(fp_loader_test, opt):
                                                nd_to_sample, ed_to_sample)
         #iou_norm,giou_norm = compute_iou_list(real_mks,given_y,given_w,nd_to_sample,ed_to_sample,'valid')
         # Save images
-        extracted_room_stats = [gen_mks.detach().cpu().numpy(),real_mks.detach().cpu().numpy(), given_nds.detach().cpu().numpy(), given_eds.detach().cpu().numpy(), \
-                                               nd_to_sample.detach().cpu().numpy(), ed_to_sample.detach().cpu().numpy()]
+        #np.save()
         save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
         save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done), \
                    nrow=12, normalize=False)
-        np.save('./tracking/area_stats_'+str(batches_done)+'_valid_pi.npy',extracted_room_stats)
+        
+        extracted_room_stats = [gen_mks.detach().cpu().numpy(),real_mks.detach().cpu().numpy(), given_nds.detach().cpu().numpy(), given_eds.detach().cpu().numpy(), \
+                                    nd_to_sample.detach().cpu().numpy(), ed_to_sample.detach().cpu().numpy()]
+        np.save('./tracking/vaild_stats_'+exp_folder+str(batches_done)+'.npy',extracted_room_stats)
         #return iou_norm,giou_norm
 
 def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sample):
@@ -170,6 +172,9 @@ def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sampl
                                                 nd_to_sample, ed_to_sample)
         save_image(imgs_tensor,"./exps/{}/{}_train_real.png".format(exp_folder, batches_done), \
                     nrow=12, normalize=False)
+        extracted_room_stats = [gen_mks.detach().cpu().numpy(),real_mks.detach().cpu().numpy(), given_nds.detach().cpu().numpy(), given_eds.detach().cpu().numpy(), \
+                                    nd_to_sample.detach().cpu().numpy(), ed_to_sample.detach().cpu().numpy()]
+        np.save('./tracking/train_stats_'+exp_folder+str(batches_done)+'.npy',extracted_room_stats)
     return
     
 if __name__ == '__main__':
@@ -332,7 +337,64 @@ if __name__ == '__main__':
                 else:
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
-###########################new loss################
+                
+                #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
+###########################iou loss################
+                #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
+                fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm_v1(real_mks.data, \
+                                                                gen_mks, \
+                                                                given_eds, nd_to_sample, \
+                                                                ed_to_sample,str(batches_done))
+
+                fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
+                real_pos_giou = []
+                fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
+                real_pos_ci = []
+                for giou_k,v in fake_iou_pos.items():
+                    fake_pos_giou.append(v[1])
+                    real_pos_giou.append(real_iou_pos[giou_k][1])
+                    fake_pos_ci.append(v[2])
+                    real_pos_ci.append(real_iou_pos[giou_k][2])
+
+                fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
+                real_neg_giou = []
+                for giou_k,v in fake_iou_neg.items():
+                    fake_neg_giou.append(v[1])
+                    real_neg_giou.append(real_iou_neg[giou_k][1])
+                
+                def transfer_list_to_tensor(data):
+                    target = torch.ones(len(data))
+                    for i,v in enumerate(data):
+                        target[i] = v.clone()
+                    return target
+                
+                fake_pos_giou = transfer_list_to_tensor(fake_pos_giou)
+                fake_neg_giou = transfer_list_to_tensor(fake_neg_giou)
+                real_pos_giou = transfer_list_to_tensor(real_pos_giou)
+                real_neg_giou = transfer_list_to_tensor(real_neg_giou)
+                fake_pos_ci = transfer_list_to_tensor(fake_pos_ci)
+                real_pos_ci = transfer_list_to_tensor(real_pos_ci)
+                all_fake_giou = torch.cat((fake_pos_giou,fake_neg_giou),0)
+                all_real_giou = torch.cat((real_pos_giou, real_neg_giou),0)
+                # print(fake_pos_giou)
+                # print(fake_neg_giou)
+                # print(real_pos_giou)
+                # print(real_neg_giou)
+                # print(fake_pos_ci)
+                # print(real_pos_ci)
+
+                #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
+                #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
+                all_giou_loss = BCE_loss(sig(all_fake_giou),sig(all_real_giou))
+                pos_giou_loss = BCE_loss(sig(fake_pos_giou),sig(real_pos_giou))
+                neg_giou_loss = BCE_loss(sig(fake_neg_giou),sig(real_neg_giou))
+                pos_ci_loss = BCE_loss(fake_pos_ci,real_pos_ci)
+
+                if len(real_iou_invalid) == 0:
+                    print(1)
+
+#################################
+#########area#####################
                 real_area = compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
                 fake_area = compute_area_list(gen_mks, given_nds, nd_to_sample)
                 area_loss_dict = {}
@@ -348,19 +410,22 @@ if __name__ == '__main__':
                 all_areas_loss = sum(area_loss_dict.values())
 ###########################
                 # Update generator
-                g_loss = -torch.mean(fake_validity)  + all_areas_loss
+                g_loss = -torch.mean(fake_validity) + 6 * pos_ci_loss + 6 * neg_giou_loss + all_areas_loss
                 g_loss.backward()
                 # for name, parms in generator.named_parameters():	
                 #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
                 #     ' -->grad_value:',parms.grad)
                 optimizer_G.step()
 
-                print("[time %s] [Epoch %d/%d] [Batch %d/%d] [Batch_done %d] \
-                        [D loss: %f] [G loss: %f] [gp:%f] \
-                        [area_loss:%s] [area_detail:%s]"
+                #output###############                
+                for k,v in area_loss_dict.items():
+                    area_loss_dict[k] = float(v.detach().cpu().numpy())
+
+                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[pos_giou_loss:%f]\t[neg_giou_loss:%f]\t[all_giou_loss:%f] "
                     % (str(datetime.now()),epoch, opt.n_epochs, i, len(fp_loader),batches_done, \
                         d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                            ,str(all_areas_loss),str(area_loss_dict)))
+                            ,float(all_areas_loss.detach().cpu().numpy()),str(all_areas_loss.grad_fn),str(area_loss_dict)\
+                            ,float(pos_ci_loss.detach().cpu().numpy()),str(pos_ci_loss.grad_fn),float(pos_giou_loss.detach().cpu().numpy()),float(neg_giou_loss.detach().cpu().numpy()),float(all_giou_loss.detach().cpu().numpy())))
 
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
