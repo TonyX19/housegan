@@ -375,10 +375,10 @@ if __name__ == '__main__':
 
                 #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
                 #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
-                all_giou_norm = torch.norm(all_fake_giou - all_real_giou,p=1)
-                pos_giou_norm = torch.norm(fake_pos_giou-real_pos_giou,p=1)
-                neg_giou_norm = torch.norm(fake_neg_giou-real_neg_giou,p=1)
-                pos_ci_norm = torch.norm(fake_pos_ci-real_pos_ci,p=1)
+                all_giou_norm = torch.norm(all_fake_giou - all_real_giou,p=1).mean()
+                pos_giou_norm = torch.norm(fake_pos_giou-real_pos_giou,p=1).mean()
+                neg_giou_norm = torch.norm(fake_neg_giou-real_neg_giou,p=1).mean()
+                pos_ci_norm = torch.norm(fake_pos_ci-real_pos_ci,p=1).mean()
 #################################
 #########area#####################
                 sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample)
