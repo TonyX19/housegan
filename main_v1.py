@@ -398,7 +398,11 @@ if __name__ == '__main__':
 ##############################
                 # Update generator
                 g_loss = -torch.mean(fake_validity)  + all_areas_loss + sp + pos_ci_norm + neg_giou_norm
-                
+                ###debug
+                if torch.isinf(g_loss) :
+                    print("bug data saving")
+                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
+                    print("bug data done")
                 g_loss.backward()
                 optimizer_G.step()
                 area_loss_dict = {}
