@@ -338,6 +338,7 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
                 
+                smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
 ###########################iou loss################
                 #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
@@ -375,14 +376,14 @@ if __name__ == '__main__':
 
                 #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
                 #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
-                all_giou_norm = torch.norm(all_fake_giou - all_real_giou,p=1).mean()
-                pos_giou_norm = torch.norm(fake_pos_giou-real_pos_giou,p=1).mean()
-                neg_giou_norm = torch.norm(fake_neg_giou-real_neg_giou,p=1).mean()
-                pos_ci_norm = torch.norm(fake_pos_ci-real_pos_ci,p=1).mean()
+                all_giou_norm = smooth_l1(all_fake_giou , all_real_giou)
+                pos_giou_norm = smooth_l1(fake_pos_giou , real_pos_giou)
+                neg_giou_norm = smooth_l1(fake_neg_giou , real_neg_giou)
+                pos_ci_norm = smooth_l1(fake_pos_ci , real_pos_ci)
 #################################
 #########area#####################
-                sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample)
-                area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample)
+                sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
+                area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
                 all_areas_loss = sum(area_dict.values())         
 ##############################
                 # Update generator
@@ -391,13 +392,13 @@ if __name__ == '__main__':
                 optimizer_G.step()
                 area_loss_dict = {}
                 for k,v in area_dict.items():
-                    area_loss_dict[k] = float(v.detach().cpu().numpy())
+                    area_loss_dict[k] = float(v.data)
 
                 print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[pos_giou_loss:%f]\t[neg_giou_loss:%f]\t[all_giou_loss:%f]\t[sp:%s] "
                         % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                             d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                                ,float(all_areas_loss.detach().cpu().numpy()),str(all_areas_loss.grad_fn),str(area_dict)\
-                                ,float(pos_ci_norm.detach().cpu().numpy()),str(pos_ci_norm.grad_fn),float(pos_giou_norm.detach().cpu().numpy()),float(neg_giou_norm.detach().cpu().numpy()),float(all_giou_norm.detach().cpu().numpy()),str(sp)))
+                                ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                ,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(pos_giou_norm.data),float(neg_giou_norm.data),float(all_giou_norm.data),str(sp)))
                                
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:

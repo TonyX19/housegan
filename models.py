@@ -283,7 +283,7 @@ def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
             rooms_areas[room_type].append(area_rate)
     return rooms_areas
 
-def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample):
+def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample,criterion):
     real_area,real_shape = compute_area_list_v1(real_mask,given_y,nd_to_sample)
     fake_area,fake_shape = compute_area_list_v1(fake_mask,given_y,nd_to_sample)
     area_ret = {}
@@ -296,9 +296,10 @@ def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample):
 #         avg_bias = torch.tensor(real_shape[fr_type]) * (torch.tensor(1.0) - torch.tensor(fake_avg[fr_type]))
 #         l1_norm = (r_area_list - avg_bias - f_area_list).norm(p=1)#均值存在问题，就是0情况下 norm很小
         #l1_shape_norm =  (torch.FloatTensor() - torch.FloatTensor(fake_shape[fr_type])).norm(p=1) #分散成度
-        l1_area_norm = ((r_area_list - f_area_list)/torch.FloatTensor(fake_shape[fr_type])).norm(p=1).mean() #real 和 fake 面积同差除以real shape 就是不同面积在同等尺度上的比较避免了 fake散开的情况
+        fr_type_t = torch.FloatTensor(fake_shape[fr_type])
+        #l1_area_norm = ((r_area_list - f_area_list)/torch.FloatTensor(fake_shape[fr_type])).norm(p=1).mean() #real 和 fake 面积同差除以real shape 就是不同面积在同等尺度上的比较避免了 fake散开的情况
         #如果是real shape 没有意义 r_area_list 永远是1
-        area_ret[fr_type] = l1_area_norm
+        area_ret[fr_type] = criterion(f_area_list/fr_type_t,r_area_list/fr_type_t)
 
     return area_ret
 
@@ -364,7 +365,7 @@ def compute_empty_area(mask,axes):
     
     return area_v
 
-def compute_sparsity_penalty(masks,given_w,nd_to_sample):
+def compute_sparsity_penalty(masks,given_w,nd_to_sample,criterion):
     maps_batch = masks.detach().cpu().numpy()
     edges_batch = given_w.detach().cpu().numpy()
     batch_size = torch.max(nd_to_sample) + 1
@@ -380,8 +381,9 @@ def compute_sparsity_penalty(masks,given_w,nd_to_sample):
             empty_area = compute_empty_area(masks[mks_idx],[x0, y0, x1, y1])
             mks_idx +=1
             ret.append(empty_area)
-            
-    return transfer_list_to_tensor(ret).norm(p=1)
+    ret_tensor = transfer_list_to_tensor(ret)
+    object_ = torch.zeros(ret_tensor.shape[-1])
+    return criterion(ret_tensor,object_)
 
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
