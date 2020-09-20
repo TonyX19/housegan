@@ -37,7 +37,7 @@ parser.add_argument("--sample_interval", type=int, default=1000, help="interval 
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
-parser.add_argument("--is_eloss_lim", type=int, default=2, help="extra_loss_lim")
+parser.add_argument("--eloss_lim", type=int, default=2, help="extra_loss_limitation")
 parser.add_argument("--is_mean", type=bool, default=True, help="extra_loss_mean")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
@@ -52,7 +52,7 @@ if debug : ## debug variable impact the rest of packages
 
 
 
-extra_loss_lim = opt.is_eloss_lim
+extra_loss_lim = opt.eloss_lim
 cuda = True if torch.cuda.is_available() else False
 lambda_gp = 10
 multi_gpu = False
@@ -397,7 +397,8 @@ if __name__ == '__main__':
                 all_areas_loss = sum(area_dict.values())         
 ##############################
                 # Update generator
-                g_loss = -torch.mean(fake_validity)  + all_areas_loss + 5 * sp + pos_ci_norm + neg_giou_norm
+                g_loss = -torch.mean(fake_validity)  + all_areas_loss + sp + pos_ci_norm + neg_giou_norm
+                
                 g_loss.backward()
                 optimizer_G.step()
                 area_loss_dict = {}
