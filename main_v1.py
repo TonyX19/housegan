@@ -402,6 +402,10 @@ if __name__ == '__main__':
     ##############################
                     # Update generator
                     g_loss = g_loss  + all_areas_loss + sp 
+                    
+                    area_loss_dict = {}
+                    for k,v in area_dict.items():
+                        area_loss_dict[k] = float(v.data)
                 #+ pos_ci_norm + neg_giou_norm
                 ###debug
                 if torch.isinf(g_loss) :
@@ -410,9 +414,7 @@ if __name__ == '__main__':
                     print("bug data done")
                 g_loss.backward()
                 optimizer_G.step()
-                area_loss_dict = {}
-                for k,v in area_dict.items():
-                    area_loss_dict[k] = float(v.data)
+
                 if epoch > extra_loss_lim:
                     print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
