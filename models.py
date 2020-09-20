@@ -364,6 +364,34 @@ def compute_iou_list_v3(masks,given_w,nd_to_sample,ed_to_sample,im_size=256):
 
 
 
+def compute_common_loss(real_mks,gen_mks, given_eds, nd_to_sample,  ed_to_sample,criterion):
+    real_rate = compute_common_area(real_mks, given_eds, nd_to_sample,  ed_to_sample)
+    fake_rate = compute_common_area(gen_mks, given_eds, nd_to_sample,  ed_to_sample)
+
+    return criterion(fake_rate,real_rate)
+
+def compute_common_area(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ####only positive
+    edges_batch = given_w.detach().cpu().numpy()
+    pos_edges_batch = edges_batch[edges_batch[:,1]>0]
+    ret = torch.zeros((pos_edges_batch.shape[0],1))
+    
+    pos_idx = 0
+    for ed in edges_batch:
+        s,w,d = ed
+        if w < 0:
+            continue;
+        
+        master_mk = masks[s]
+        margin_mk = masks[d]
+        intersection = torch.sum(master_mk[(master_mk >0) & (margin_mk >0)])
+        master_area = torch.sum(master_mk[master_mk>0])
+        if master_area == 0.:
+            master_area = master_area + torch.tensor(1.)
+        ret[pos_idx] = intersection/master_area
+        pos_idx+=1
+            
+    return ret
+
 def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
     maps_batch = x_fake.detach().cpu().numpy()
     nodes_batch = given_y.detach().cpu().numpy()
