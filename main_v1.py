@@ -350,40 +350,41 @@ if __name__ == '__main__':
                 #                                                 gen_mks, \
                 #                                                 given_eds, nd_to_sample, \
                 #                                                 ed_to_sample,str(batches_done))
-                fake_iou_pos,fake_iou_neg,real_iou_pos,real_iou_neg = compute_iou_norm_v2(real_mks.data, \
-                                                                gen_mks, \
-                                                                given_eds, nd_to_sample, \
-                                                                ed_to_sample,str(batches_done))
-                fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
-                real_pos_giou = []
-                fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
-                real_pos_ci = []
-                for giou_k,v in fake_iou_pos.items():
-                    fake_pos_giou.append(v[1])
-                    real_pos_giou.append(real_iou_pos[giou_k][1])
-                    fake_pos_ci.append(v[2])
-                    real_pos_ci.append(real_iou_pos[giou_k][2])
+                ###########################vaild################
+                # fake_iou_pos,fake_iou_neg,real_iou_pos,real_iou_neg = compute_iou_norm_v2(real_mks.data, \
+                #                                                 gen_mks, \
+                #                                                 given_eds, nd_to_sample, \
+                #                                                 ed_to_sample,str(batches_done))
+                # fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
+                # real_pos_giou = []
+                # fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
+                # real_pos_ci = []
+                # for giou_k,v in fake_iou_pos.items():
+                #     fake_pos_giou.append(v[1])
+                #     real_pos_giou.append(real_iou_pos[giou_k][1])
+                #     fake_pos_ci.append(v[2])
+                #     real_pos_ci.append(real_iou_pos[giou_k][2])
 
-                fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
-                real_neg_giou = []
-                for giou_k,v in fake_iou_neg.items():
-                    fake_neg_giou.append(v[1])
-                    real_neg_giou.append(real_iou_neg[giou_k][1])
+                # fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
+                # real_neg_giou = []
+                # for giou_k,v in fake_iou_neg.items():
+                #     fake_neg_giou.append(v[1])
+                #     real_neg_giou.append(real_iou_neg[giou_k][1])
                 
 
                 
-                # fake_pos_giou = transfer_list_to_tensor(fake_pos_giou)
-                # real_pos_giou = transfer_list_to_tensor(real_pos_giou)
-                # pos_giou_norm = smooth_l1(fake_pos_giou , real_pos_giou)
+                # # fake_pos_giou = transfer_list_to_tensor(fake_pos_giou)
+                # # real_pos_giou = transfer_list_to_tensor(real_pos_giou)
+                # # pos_giou_norm = smooth_l1(fake_pos_giou , real_pos_giou)
 
-                fake_neg_giou = transfer_list_to_tensor(fake_neg_giou)
-                real_neg_giou = transfer_list_to_tensor(real_neg_giou)
-                neg_giou_norm = smooth_l1(fake_neg_giou , real_neg_giou)
+                # fake_neg_giou = transfer_list_to_tensor(fake_neg_giou)
+                # real_neg_giou = transfer_list_to_tensor(real_neg_giou)
+                # neg_giou_norm = smooth_l1(fake_neg_giou , real_neg_giou)
 
-                fake_pos_ci = transfer_list_to_tensor(fake_pos_ci)
-                real_pos_ci = transfer_list_to_tensor(real_pos_ci)
-                pos_ci_norm = smooth_l1(fake_pos_ci , real_pos_ci)
-                
+                # fake_pos_ci = transfer_list_to_tensor(fake_pos_ci)
+                # real_pos_ci = transfer_list_to_tensor(real_pos_ci)
+                # pos_ci_norm = smooth_l1(fake_pos_ci , real_pos_ci)
+                ###########################
                 # all_fake_giou = torch.cat((fake_pos_giou,fake_neg_giou),0)
                 # all_real_giou = torch.cat((real_pos_giou, real_neg_giou),0)
                 # all_giou_norm = smooth_l1(all_fake_giou , all_real_giou)
@@ -397,7 +398,8 @@ if __name__ == '__main__':
                 all_areas_loss = sum(area_dict.values())         
 ##############################
                 # Update generator
-                g_loss = -torch.mean(fake_validity)  + all_areas_loss + sp + pos_ci_norm + neg_giou_norm
+                g_loss = -torch.mean(fake_validity)  + all_areas_loss + sp 
+                #+ pos_ci_norm + neg_giou_norm
                 ###debug
                 if torch.isinf(g_loss) :
                     print("bug data saving")
@@ -409,11 +411,11 @@ if __name__ == '__main__':
                 for k,v in area_dict.items():
                     area_loss_dict[k] = float(v.data)
 
-                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[sp:%s]"#\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                         % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                             d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
                                 ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
-                                ,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
+                                #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                 #,float(pos_giou_norm.data),float(all_giou_norm.data)\
                                 ,str(sp)))
                                
