@@ -419,10 +419,10 @@ if __name__ == '__main__':
                     print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                                 d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                                    #,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                    ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
-                                    #,str(sp)\
+                                    ,str(sp)\
                                     ))
                 else:
                     print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
@@ -431,7 +431,8 @@ if __name__ == '__main__':
                                     # ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
-                                    ,str(sp)))               
+                                    #,str(sp)
+                                    ))               
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
