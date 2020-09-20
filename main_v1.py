@@ -37,7 +37,8 @@ parser.add_argument("--sample_interval", type=int, default=1000, help="interval 
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
-parser.add_argument("--extra_loss_lim", type=int, default=2, help="debug")
+parser.add_argument("--is_eloss_lim", type=int, default=2, help="extra_loss_lim")
+parser.add_argument("--is_mean", type=bool, default=True, help="extra_loss_mean")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
@@ -51,10 +52,11 @@ if debug : ## debug variable impact the rest of packages
 
 
 
-extra_loss_lim = opt.extra_loss_lim
+extra_loss_lim = opt.is_eloss_lim
 cuda = True if torch.cuda.is_available() else False
 lambda_gp = 10
 multi_gpu = False
+is_mean = opt.is_mean
 # exp_folder = "{}_{}_g_lr_{}_d_lr_{}_bs_{}_ims_{}_ld_{}_b1_{}_b2_{}".format(opt.exp_folder, opt.target_set, opt.g_lr, opt.d_lr, \
 #                                                                         opt.batch_size, opt.img_size, \
 #                                                                         opt.latent_dim, opt.b1, opt.b2)
@@ -337,8 +339,10 @@ if __name__ == '__main__':
                 else:
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
-                
-                smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
+                if is_mean :
+                    smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
+                else:
+                    smooth_l1 = torch.nn.SmoothL1Loss()
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
 ###########################iou loss################
                 #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
