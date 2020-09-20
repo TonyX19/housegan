@@ -37,7 +37,7 @@ parser.add_argument("--sample_interval", type=int, default=1000, help="interval 
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
-parser.add_argument("--eloss_lim", type=int, default=2, help="extra_loss_limitation")
+parser.add_argument("--eloss_lim", type=int, default=1, help="extra_loss_limitation")
 parser.add_argument("--is_mean", type=bool, default=True, help="extra_loss_mean")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
@@ -339,6 +339,8 @@ if __name__ == '__main__':
                 else:
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
+                g_loss = -torch.mean(fake_validity)
+
                 if is_mean :
                     smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
                 else:
@@ -350,7 +352,7 @@ if __name__ == '__main__':
                 #                                                 gen_mks, \
                 #                                                 given_eds, nd_to_sample, \
                 #                                                 ed_to_sample,str(batches_done))
-                ###########################vaild################
+                ###########################vaild################计算慢 和 inf
                 # fake_iou_pos,fake_iou_neg,real_iou_pos,real_iou_neg = compute_iou_norm_v2(real_mks.data, \
                 #                                                 gen_mks, \
                 #                                                 given_eds, nd_to_sample, \
@@ -392,13 +394,14 @@ if __name__ == '__main__':
                 #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
                 #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
 #################################
-#########area#####################
-                sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
-                area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
-                all_areas_loss = sum(area_dict.values())         
-##############################
-                # Update generator
-                g_loss = -torch.mean(fake_validity)  + all_areas_loss + sp 
+                if epoch > extra_loss_lim:
+    #########area#####################
+                    sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
+                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
+                    all_areas_loss = sum(area_dict.values())         
+    ##############################
+                    # Update generator
+                    g_loss = g_loss  + all_areas_loss + sp 
                 #+ pos_ci_norm + neg_giou_norm
                 ###debug
                 if torch.isinf(g_loss) :
@@ -410,15 +413,23 @@ if __name__ == '__main__':
                 area_loss_dict = {}
                 for k,v in area_dict.items():
                     area_loss_dict[k] = float(v.data)
-
-                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
-                        % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                            d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                                ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
-                                #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
-                                #,float(pos_giou_norm.data),float(all_giou_norm.data)\
-                                ,str(sp)))
-                               
+                if epoch > extra_loss_lim:
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                            % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
+                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                    #,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                    #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
+                                    #,float(pos_giou_norm.data),float(all_giou_norm.data)\
+                                    #,str(sp)\
+                                    ))
+                else:
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                            % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
+                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                    # ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                    #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
+                                    #,float(pos_giou_norm.data),float(all_giou_norm.data)\
+                                    ,str(sp)))               
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
