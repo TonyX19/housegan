@@ -523,6 +523,53 @@ def compute_sparsity_penalty(masks,given_w,nd_to_sample,criterion):
     object_ = torch.zeros(ret_tensor.shape[-1])
     return criterion(ret_tensor,object_)
 
+def compute_sparsity_penalty_v1(masks,nd_to_sample,criterion):
+    ret_tensor = torch.zeros(masks.shape[0])
+    maps_batch = masks.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    ret = []
+    mks_idx = 0
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        mks = maps_batch[inds_nd]
+
+        for mk in mks:
+            new_mask = torch.zeros(mk.shape)
+            mk_np = np.around(mk, decimals=1)
+            m_x0, m_y0, m_x1, m_y1 = mask_to_bb(mk)
+            if [m_x0, m_y0, m_x1, m_y1] == [0, 0, 0, 0]:
+                ret_tensor[mks_idx] = torch.tensor(0.)
+                mks_idx +=1
+                continue;
+            
+            if mk_np[m_y0:m_y1,m_x0:m_x1][mk_np[m_y0:m_y1,m_x0:m_x1]>0].size == 0:
+                ret_tensor[mks_idx] = torch.tensor(0.)
+                mks_idx +=1
+                continue;
+            avg_np = mk_np[m_y0:m_y1,m_x0:m_x1][mk_np[m_y0:m_y1,m_x0:m_x1]>0].mean()
+            #avg = mk[fy1:fy2,fx1:fx2][mk[fy1:fy2,fx1:fx2]>0].mean()
+            sp_d = avg_np ### 对于gen_mk[0] 还是存在问题
+            ####max list center axes######
+            x_max_l ,y_max_l = np.where(mk_np==np.max(mk_np))
+            x_max = np.median(x_max_l)
+            y_max = np.median(y_max_l)
+############get noising area########################
+####step 1 get pos area masking ################
+            mk_peak_area = (mk - sp_d)
+            mk[mk_peak_area>0] = 0.
+            noise_x_axis,noise_y_axis = np.array(np.where((mk>0)))
+            for idx,v in enumerate(noise_x_axis):
+                dist = math.sqrt(abs(v - x_max)**2 + abs(noise_y_axis[idx]-y_max)**2)
+                new_mask[v][noise_y_axis[idx]] = masks[mks_idx][v][noise_y_axis[idx]] * dist
+            penalty_sum = torch.sum(new_mask[new_mask>0])
+            penalty_rate = ((masks[mks_idx][m_y0:m_y1,m_x0:m_x1]<0).nonzero(as_tuple=False).shape[0]/abs((m_y1 - m_y0)*(m_x1 - m_x0)))
+            penalty = penalty_rate * penalty_sum
+            ret_tensor[mks_idx] = penalty
+            mks_idx +=1
+
+    object_ = torch.zeros(ret_tensor.shape[-1])
+    return criterion(ret_tensor,object_)
+
 def compute_iou_penalty_norm(x_real,x_fake,given_y,given_w,nd_to_sample,ed_to_sample,serial='1'):
     fake_iou_list = compute_iou_list(x_fake,given_y,given_w,nd_to_sample,ed_to_sample,'fake')
     real_iou_list = compute_iou_list(x_real,given_y,given_w,nd_to_sample,ed_to_sample,'real')

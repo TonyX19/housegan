@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tensor
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_sparsity_penalty,compute_common_loss
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -351,21 +351,23 @@ if __name__ == '__main__':
                     print('running')
 ###########################iou loss################
                     #pos:
-                    common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=BCE_loss)
+                    ##common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=BCE_loss)
                     #neg:
 
 #################################
-    #########area#####################
-                    sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
-                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
-                    all_areas_loss = sum(area_dict.values())         
-    ##############################
+#########area#####################
+                    ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
+                    sp = compute_sparsity_penalty_v1(gen_mks,nd_to_sample,smooth_l1)##会修改gen_masks
+                    ## area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
+                    ## all_areas_loss = sum(area_dict.values())         
+##############################
                     # Update generator
-                    g_loss = g_loss  + all_areas_loss + sp + common_pen
+                    g_loss = g_loss   + sp 
+                    ##+ common_pen + 7*all_areas_loss
                     
-                    area_loss_dict = {}
-                    for k,v in area_dict.items():
-                        area_loss_dict[k] = float(v.data)
+                    ## area_loss_dict = {}
+                    ## for k,v in area_dict.items():
+                    ##     area_loss_dict[k] = float(v.data)
                 #+ pos_ci_norm + neg_giou_norm
                 ###debug
                 if torch.isinf(g_loss) :
@@ -376,13 +378,14 @@ if __name__ == '__main__':
                 optimizer_G.step()
 
                 if epoch > extra_loss_lim:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[sp:%s]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                                 d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                                    ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                    #,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
-                                    ,str(sp),str(common_pen)\
+                                    ,str(sp)
+                                    #,str(common_pen)\
                                     ))
                 else:
                     print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
