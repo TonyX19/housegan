@@ -1321,7 +1321,8 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
     return all_imgs
 
 def transfer_list_to_tensor(data):
-    target = torch.ones(len(data))
-    for k_,v in enumerate(data):
-        target[k_] = v
-    return target
+    # target = torch.ones(len(data))
+    # for k_,v in enumerate(data):
+    #     target[k_] = v
+    # return target
+    return torch.stack(data)

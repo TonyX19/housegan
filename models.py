@@ -428,8 +428,8 @@ def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample,criterion
     for fr_type,f_area_list in fake_area.items():
         f_area_list = transfer_list_to_tensor(f_area_list)
         r_area_list = transfer_list_to_tensor(real_area[fr_type])
-        if sum(f_area_list) < 1000.: #####前期惩罚过大
-            f_area_list = r_area_list
+        # if sum(f_area_list) < 1000.: #####前期惩罚过大
+        #     f_area_list = r_area_list
 #         f_mean = f_area_list.mean()
 #         avg_bias = torch.tensor(real_shape[fr_type]) * (torch.tensor(1.0) - torch.tensor(fake_avg[fr_type]))
 #         l1_norm = (r_area_list - avg_bias - f_area_list).norm(p=1)#均值存在问题，就是0情况下 norm很小

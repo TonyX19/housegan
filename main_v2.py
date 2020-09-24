@@ -289,26 +289,27 @@ if __name__ == '__main__':
 
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-                                            gen_mks.data, given_nds.data, \
-                                            given_eds.data, nd_to_sample.data,\
-                                            data_parallel, ed_to_sample.data)
-                # div_loss = compute_div_loss(discriminator, real_mks.data, \
-                #                                             gen_mks.data, given_nds.data, \
-                #                                             given_eds.data, nd_to_sample.data,\
-                #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
+                # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                #                             gen_mks.data, given_nds.data, \
+                #                             given_eds.data, nd_to_sample.data,\
+                #                             data_parallel, ed_to_sample.data)
+                div_loss = compute_div_loss(discriminator, real_mks.data, \
+                                                            gen_mks.data, given_nds.data, \
+                                                            given_eds.data, nd_to_sample.data,\
+                                                             ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                # div_loss = compute_div_loss(discriminator, real_mks.data, \
-                #                                             gen_mks.data, given_nds.data, \
-                #                                             given_eds.data, nd_to_sample.data, \
-                #                                             ed_to_sample.data,str(batches_done),None,p=p)
-                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                div_loss = compute_div_loss(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            None, None)
+                                                            ed_to_sample.data,str(batches_done),None,p=p)
+                # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data, \
+                #                                             None, None)
             
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
-            #+ k*div_loss
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + k*div_loss
+            #+ lambda_gp * gradient_penalty
+            
 
             # Update discriminator
             d_loss.backward()
@@ -348,7 +349,6 @@ if __name__ == '__main__':
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
 
                 if epoch > extra_loss_lim:
-                    print('running')
 ###########################iou loss################
                     #pos:
                     ##common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=BCE_loss)
@@ -358,11 +358,11 @@ if __name__ == '__main__':
 #########area#####################
                     ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
                     sp = compute_sparsity_penalty_v1(gen_mks,nd_to_sample,smooth_l1)##会修改gen_masks
-                    ## area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
-                    ## all_areas_loss = sum(area_dict.values())         
+                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
+                    all_areas_loss = sum(area_dict.values())         
 ##############################
                     # Update generator
-                    g_loss = g_loss   + sp 
+                    g_loss = g_loss   + 4 * sp + 7 * all_areas_loss
                     ##+ common_pen + 7*all_areas_loss
                     
                     ## area_loss_dict = {}
@@ -375,12 +375,17 @@ if __name__ == '__main__':
                     visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
                     print("bug data done")
                 g_loss.backward()
+                # for name, parms in generator.named_parameters():	
+                #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
+                #     ' -->grad_value:',parms.grad.shape)
+
                 optimizer_G.step()
 
                 if epoch > extra_loss_lim:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[sp:%s]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div_loss:%f]\t[sp:%s]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                d_loss.item(), g_loss.item(),div_loss\
+                                #lambda_gp * gradient_penalty\
                                     #,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
@@ -388,9 +393,10 @@ if __name__ == '__main__':
                                     #,str(common_pen)\
                                     ))
                 else:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div_loss:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                d_loss.item(), g_loss.item(),div_loss\
+                                #lambda_gp * gradient_penalty\
                                     # ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
