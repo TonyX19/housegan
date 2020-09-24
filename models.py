@@ -426,8 +426,8 @@ def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample,criterion
     fake_area,fake_shape = compute_area_list_v1(fake_mask,given_y,nd_to_sample)
     area_ret = {}
     for fr_type,f_area_list in fake_area.items():
-        f_area_list = transfer_list_to_tensor(f_area_list)
-        r_area_list = transfer_list_to_tensor(real_area[fr_type])
+        f_area_list = torch.stack(f_area_list)
+        r_area_list = torch.stack(real_area[fr_type])
         # if sum(f_area_list) < 1000.: #####前期惩罚过大
         #     f_area_list = r_area_list
 #         f_mean = f_area_list.mean()
