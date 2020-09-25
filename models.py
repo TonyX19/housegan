@@ -434,7 +434,7 @@ def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample,criterion
 #         avg_bias = torch.tensor(real_shape[fr_type]) * (torch.tensor(1.0) - torch.tensor(fake_avg[fr_type]))
 #         l1_norm = (r_area_list - avg_bias - f_area_list).norm(p=1)#均值存在问题，就是0情况下 norm很小
         #l1_shape_norm =  (torch.FloatTensor() - torch.FloatTensor(fake_shape[fr_type])).norm(p=1) #分散成度
-        fr_type_t = torch.FloatTensor(fake_shape[fr_type])
+        fr_type_t = torch.FloatTensor(fake_shape[fr_type]).to(f_area_list.device)
         #l1_area_norm = ((r_area_list - f_area_list)/torch.FloatTensor(fake_shape[fr_type])).norm(p=1).mean() #real 和 fake 面积同差除以real shape 就是不同面积在同等尺度上的比较避免了 fake散开的情况
         #如果是real shape 没有意义 r_area_list 永远是1
         area_ret[fr_type] = criterion(f_area_list/fr_type_t,r_area_list/fr_type_t)
