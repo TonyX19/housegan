@@ -289,25 +289,26 @@ if __name__ == '__main__':
 
             # Measure discriminator's ability to classify real from generated samples
             if multi_gpu:
-                # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-                #                             gen_mks.data, given_nds.data, \
-                #                             given_eds.data, nd_to_sample.data,\
-                #                             data_parallel, ed_to_sample.data)
-                div_loss = compute_div_loss(discriminator, real_mks.data, \
-                                                            gen_mks.data, given_nds.data, \
-                                                            given_eds.data, nd_to_sample.data,\
-                                                             ed_to_sample.data,str(batches_done),data_parallel,p=p)
+                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                                            gen_mks.data, given_nds.data, \
+                                            given_eds.data, nd_to_sample.data,\
+                                            data_parallel, ed_to_sample.data)
+                # div_loss = compute_div_loss(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data,\
+                #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                div_loss = compute_div_loss(discriminator, real_mks.data, \
-                                                            gen_mks.data, given_nds.data, \
-                                                            given_eds.data, nd_to_sample.data, \
-                                                            ed_to_sample.data,str(batches_done),None,p=p)
-                # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                # div_loss = compute_div_loss(discriminator, real_mks.data, \
                 #                                             gen_mks.data, given_nds.data, \
                 #                                             given_eds.data, nd_to_sample.data, \
-                #                                             None, None)
+                #                                             ed_to_sample.data,str(batches_done),None,p=p)
+                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                                                            gen_mks.data, given_nds.data, \
+                                                            given_eds.data, nd_to_sample.data, \
+                                                            None, None)
             
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + k*div_loss
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity)+ lambda_gp * gradient_penalty
+            # + k*div_loss
             #+ lambda_gp * gradient_penalty
             
 
