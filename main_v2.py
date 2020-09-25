@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tensor
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1
+from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -180,8 +180,6 @@ def visualizeBatch(real_mks,gen_mks,given_nds,given_eds,nd_to_sample,ed_to_sampl
     return
     
 if __name__ == '__main__':
-    k = 2.0
-    p = 6
     # Configure data loader
     rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/' # replace with your dataset path need abs path
     #rooms_path = '/home/tony_chen_x19/dataset/'
@@ -288,27 +286,28 @@ if __name__ == '__main__':
                                             given_eds.detach(), nd_to_sample.detach())
 
             # Measure discriminator's ability to classify real from generated samples
+            k = 2
+            p = 6
             if multi_gpu:
-                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
-                                            gen_mks.data, given_nds.data, \
-                                            given_eds.data, nd_to_sample.data,\
-                                            data_parallel, ed_to_sample.data)
+                div_loss = compute_div_loss_v1(discriminator, real_mks.data, \
+                                                            gen_mks.data, given_nds.data, \
+                                                            given_eds.data, nd_to_sample.data,\
+                                                             ed_to_sample.data,str(batches_done),data_parallel,p=p)
                 # div_loss = compute_div_loss(discriminator, real_mks.data, \
                 #                                             gen_mks.data, given_nds.data, \
                 #                                             given_eds.data, nd_to_sample.data,\
                 #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                # div_loss = compute_div_loss(discriminator, real_mks.data, \
-                #                                             gen_mks.data, given_nds.data, \
-                #                                             given_eds.data, nd_to_sample.data, \
-                #                                             ed_to_sample.data,str(batches_done),None,p=p)
-                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                div_loss = compute_div_loss_v1(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
-                                                            None, None)
+                                                            ed_to_sample.data,str(batches_done),None,p=p)
+                # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data, \
+                #                                             None, None)
             
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity)+ lambda_gp * gradient_penalty
-            # + k*div_loss
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + k*div_loss
             #+ lambda_gp * gradient_penalty
             
 
@@ -383,9 +382,9 @@ if __name__ == '__main__':
                 optimizer_G.step()
 
                 if epoch > extra_loss_lim:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[sp:%s]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]"#\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div:%f]\t[sp:%s]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]"#\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                d_loss.item(), g_loss.item(),div_loss\
                                 #lambda_gp * gradient_penalty\
                                     ,str(sp)\
                                     ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)
@@ -394,9 +393,9 @@ if __name__ == '__main__':
                                     #,str(common_pen)\
                                     ))
                 else:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                d_loss.item(), g_loss.item(),div_loss\
                                 #lambda_gp * gradient_penalty\
                                     # ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
