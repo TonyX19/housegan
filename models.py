@@ -535,7 +535,7 @@ def compute_sparsity_penalty_v1(masks,nd_to_sample,criterion):
 
         for mk in mks:
             new_mask = torch.zeros(mk.shape)
-            mk_np = np.around(mk, decimals=1)
+            mk_np = np.around(mk, decimals=5) #精度太低导致弱值发散
             m_x0, m_y0, m_x1, m_y1 = mask_to_bb(mk)
             if [m_x0, m_y0, m_x1, m_y1] == [0, 0, 0, 0]:
                 ret_tensor[mks_idx] = torch.tensor(0.)
