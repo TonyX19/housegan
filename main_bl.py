@@ -333,18 +333,16 @@ if __name__ == '__main__':
                 g_loss = -torch.mean(fake_validity)
 
 
-                if is_mean :
-                    smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
-                else:
-                    smooth_l1 = torch.nn.SmoothL1Loss()
+
+                smooth_l1 = torch.nn.SmoothL1Loss()
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
 
 ###########################iou loss################
-                common_pen = compute_common_loss(real_mks.data,gen_mks.data,given_eds.data,nd_to_sample.data,ed_to_sample.data,criterion=BCE_loss)
+                common_pen = compute_common_loss(real_mks.detach(),gen_mks.detach(),given_eds.detach(),nd_to_sample.detach(),ed_to_sample.detach(),criterion=BCE_loss)
 #################################
 #########area#####################
-                sp = compute_sparsity_penalty_v1(gen_mks.data,nd_to_sample.data,smooth_l1)##会修改gen_masks
-                area_dict = compute_area_norm_penalty(real_mks.data,gen_mks.data,given_nds.data,nd_to_sample.data,smooth_l1)
+                sp = compute_sparsity_penalty_v1(gen_mks.detach(),nd_to_sample.detach(),smooth_l1)##会修改gen_masks
+                area_dict = compute_area_norm_penalty(real_mks.detach(),gen_mks.detach(),given_nds.detach(),nd_to_sample.detach(),smooth_l1)
                 all_areas_loss = sum(area_dict.values())         
 ##############################
                     
