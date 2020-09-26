@@ -776,7 +776,7 @@ def conv_block(in_channels, out_channels, k, s, p, act=None, upsample=False, spe
     elif "tanh":
         block.append(torch.nn.Tanh())
     return block
-
+ 
 class CMP(nn.Module):
     def __init__(self, in_channels):
         super(CMP, self).__init__()
