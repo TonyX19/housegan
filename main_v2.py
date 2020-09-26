@@ -363,6 +363,9 @@ if __name__ == '__main__':
                     # Update generator
                     sp_k = 4
                     area_k = len(area_dict)
+                    if not is_mean:
+                        sp_k = 1;
+                        area_k = 1;
                     g_loss = g_loss   + sp_k * sp + area_k * all_areas_loss
                     ##+ common_pen + 7*all_areas_loss
                     
@@ -387,8 +390,8 @@ if __name__ == '__main__':
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                                 d_loss.item(), g_loss.item(),div_loss\
                                 #lambda_gp * gradient_penalty\
-                                    ,str(sp)\
-                                    ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)
+                                    ,str(sp_k * sp )\
+                                    ,float(area_k * all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
                                     #,str(common_pen)\
