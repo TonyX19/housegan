@@ -28,9 +28,12 @@ import matplotlib.pyplot as plt
 from utils import ID_COLOR
 from tqdm import tqdm
 from collections import defaultdict
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_cpu", type=int, default=4, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches - does not support larger batchs")
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
@@ -39,6 +42,7 @@ parser.add_argument("--num_variations", type=int, default=10, help="number of va
 parser.add_argument("--checkpoint", type=str, default='', help="destination folder") 
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove")
 opt = parser.parse_args()
+checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/exp_demo_D_500000.pth'
 
 def return_eq(node1, node2):
     return node1['label']==node2['label']
@@ -86,18 +90,19 @@ def draw_floorplan(dwg, junctions, juncs_on, lines_on):
         dwg.add(dwg.circle(center=(x, y), r=2, stroke='red', fill='white', stroke_width=1, opacity=0.75))
     return 
 
-# Initialize generator and discriminator
-generator = Generator()
-generator.load_state_dict(torch.load(opt.checkpoint))
-generator.eval()
-
 # Initialize variables
 cuda = True if torch.cuda.is_available() else False
 if cuda:
     generator.cuda()
 
+
+# Initialize generator and discriminator
+generator = Generator()
+generator.load_state_dict(torch.load(checkpoint,map_location=torch.device('cpu')))
+generator.eval()
+
 # Configure data loader
-rooms_path = '/local-scratch4/nnauata/autodesk/FloorplanDataset/'
+rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/'
 fp_dataset = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), \
                                    target_set=opt.target_set, split='eval')
 fp_loader = torch.utils.data.DataLoader(fp_dataset, 

@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_cpu", type=int, default=16, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_cpu", type=int, default=4, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
@@ -39,10 +39,10 @@ print(opt)
 
 numb_iters = 200000
 exp_name = 'exp_with_graph_global_new'
-target_set = 'E'
+target_set = 'D'
 phase='eval'
 checkpoint = './checkpoints/{}_{}_{}.pth'.format(exp_name, target_set, numb_iters)
-
+checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/exp_demo_D_500000.pth'
 # Create folder
 path_real = './FID/{}_{}/real'.format(exp_name, target_set)
 path_fake = './FID/{}_{}/fake'.format(exp_name, target_set)
@@ -57,7 +57,7 @@ generator.load_state_dict(torch.load(checkpoint))
 cuda = True if torch.cuda.is_available() else False
 if cuda:
     generator.cuda()
-rooms_path = '/home/nelson/Workspace/autodesk/autodesk/FloorplanDataset/'
+rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/'
 
 # Initialize dataset iterator
 fp_dataset_test = FloorplanGraphDataset(rooms_path, transforms.Normalize(mean=[0.5], std=[0.5]), target_set=target_set, split=phase)

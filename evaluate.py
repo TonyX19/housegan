@@ -42,7 +42,7 @@ parser.add_argument("--num_variations", type=int, default=10, help="number of va
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 # parser.add_argument("--checkpoint", type=str, default='checkpoints/gen_neighbour_exp_10_nodes_train_split_1000000.pth', help="destination folder")
 
-
+checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/exp_demo_D_500000.pth'
 opt = parser.parse_args()
 print(opt)
 
@@ -98,7 +98,7 @@ def draw_floorplan(dwg, junctions, juncs_on, lines_on):
 
 # Initialize generator and discriminator
 generator = Generator(opt.with_boundary)
-generator.load_state_dict(torch.load(opt.checkpoint))
+generator.load_state_dict(torch.load(checkpoint))
 generator.eval()
 
 # Initialize variables
