@@ -361,7 +361,9 @@ if __name__ == '__main__':
                     all_areas_loss = sum(area_dict.values())         
 ##############################
                     # Update generator
-                    g_loss = g_loss   + 4 * sp + 7 * all_areas_loss
+                    sp_k = 4
+                    area_k = len(area_dict)
+                    g_loss = g_loss   + sp_k * sp + area_k * all_areas_loss
                     ##+ common_pen + 7*all_areas_loss
                     
                     ## area_loss_dict = {}
