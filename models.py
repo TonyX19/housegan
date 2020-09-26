@@ -569,8 +569,7 @@ def compute_sparsity_penalty_v2(masks,nd_to_sample,criterion):
             mks_idx +=1
 
     object_ = torch.zeros(ret_tensor.shape[-1]).to(masks.device)
-    #return criterion(ret_tensor,object_)
-    return ret_tensor.norm(p=1)
+    return criterion(ret_tensor,object_)
 
 
 def compute_sparsity_penalty_v1(masks,nd_to_sample,criterion):
