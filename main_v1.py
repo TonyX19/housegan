@@ -16,8 +16,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
-from utils import combine_images_maps, rectangle_renderer
-from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_iou_norm_v1,compute_area_list
+from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tensor
+from models import Discriminator, Generator, compute_div_loss, weights_init_normal,compute_gradient_penalty,compute_iou_norm_v2,compute_area_norm_penalty,compute_sparsity_penalty
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -37,7 +37,8 @@ parser.add_argument("--sample_interval", type=int, default=1000, help="interval 
 parser.add_argument("--exp_folder", type=str, default='exp', help="destination folder")
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
-parser.add_argument("--extra_loss_lim", type=int, default=2, help="debug")
+parser.add_argument("--eloss_lim", type=int, default=1, help="extra_loss_limitation")
+parser.add_argument("--is_mean", type=bool, default=True, help="extra_loss_mean")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
@@ -51,10 +52,11 @@ if debug : ## debug variable impact the rest of packages
 
 
 
-extra_loss_lim = opt.extra_loss_lim
+extra_loss_lim = opt.eloss_lim
 cuda = True if torch.cuda.is_available() else False
 lambda_gp = 10
 multi_gpu = False
+is_mean = opt.is_mean
 # exp_folder = "{}_{}_g_lr_{}_d_lr_{}_bs_{}_ims_{}_ld_{}_b1_{}_b2_{}".format(opt.exp_folder, opt.target_set, opt.g_lr, opt.d_lr, \
 #                                                                         opt.batch_size, opt.img_size, \
 #                                                                         opt.latent_dim, opt.b1, opt.b2)
@@ -291,13 +293,22 @@ if __name__ == '__main__':
                                             gen_mks.data, given_nds.data, \
                                             given_eds.data, nd_to_sample.data,\
                                             data_parallel, ed_to_sample.data)
+                # div_loss = compute_div_loss(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data,\
+                #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
+                # div_loss = compute_div_loss(discriminator, real_mks.data, \
+                #                                             gen_mks.data, given_nds.data, \
+                #                                             given_eds.data, nd_to_sample.data, \
+                #                                             ed_to_sample.data,str(batches_done),None,p=p)
                 gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
                                                             gen_mks.data, given_nds.data, \
                                                             given_eds.data, nd_to_sample.data, \
                                                             None, None)
             
             d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
+            #+ k*div_loss
 
             # Update discriminator
             d_loss.backward()
@@ -328,103 +339,100 @@ if __name__ == '__main__':
                 else:
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
-                
-                #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
-                if epoch > extra_loss_lim:
-###########################iou loss################
-                    #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
-                    fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm_v1(real_mks.data, \
-                                                                    gen_mks, \
-                                                                    given_eds, nd_to_sample, \
-                                                                    ed_to_sample,str(batches_done))
+                g_loss = -torch.mean(fake_validity)
 
-                    fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
-                    real_pos_giou = []
-                    fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
-                    real_pos_ci = []
-                    for giou_k,v in fake_iou_pos.items():
-                        fake_pos_giou.append(v[1])
-                        real_pos_giou.append(real_iou_pos[giou_k][1])
-                        fake_pos_ci.append(v[2])
-                        real_pos_ci.append(real_iou_pos[giou_k][2])
-
-                    fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
-                    real_neg_giou = []
-                    for giou_k,v in fake_iou_neg.items():
-                        fake_neg_giou.append(v[1])
-                        real_neg_giou.append(real_iou_neg[giou_k][1])
-                    
-                    def transfer_list_to_tensor(data):
-                        target = torch.ones(len(data))
-                        for k_,v in enumerate(data):
-                            target[k_] = v.clone()
-                        return target
-                    
-                    fake_pos_giou = transfer_list_to_tensor(fake_pos_giou)
-                    fake_neg_giou = transfer_list_to_tensor(fake_neg_giou)
-                    real_pos_giou = transfer_list_to_tensor(real_pos_giou)
-                    real_neg_giou = transfer_list_to_tensor(real_neg_giou)
-                    fake_pos_ci = transfer_list_to_tensor(fake_pos_ci)
-                    real_pos_ci = transfer_list_to_tensor(real_pos_ci)
-                    all_fake_giou = torch.cat((fake_pos_giou,fake_neg_giou),0)
-                    all_real_giou = torch.cat((real_pos_giou, real_neg_giou),0)
-                    # print(fake_pos_giou)
-                    # print(fake_neg_giou)
-                    # print(real_pos_giou)
-                    # print(real_neg_giou)
-                    # print(fake_pos_ci)
-                    # print(real_pos_ci)
-
-                    #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
-                    #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
-                    all_giou_loss = BCE_loss(sig(all_fake_giou),sig(all_real_giou))
-                    pos_giou_loss = BCE_loss(sig(fake_pos_giou),sig(real_pos_giou))
-                    neg_giou_loss = BCE_loss(sig(fake_neg_giou),sig(real_neg_giou))
-                    pos_ci_loss = BCE_loss(fake_pos_ci,real_pos_ci)
-
-                    if len(real_iou_invalid) == 0:
-                        print(1)
-
-    #################################
-    #########area#####################
-                    real_area = compute_area_list(real_mks.data, given_nds.data, nd_to_sample.data)
-                    fake_area = compute_area_list(gen_mks, given_nds, nd_to_sample)
-                    area_loss_dict = {}
-                    for k,v in real_area.items():
-                        target = torch.ones(len(real_area[k]))
-                        input_ = torch.ones(len(real_area[k]))
-                        for k_,v_ in enumerate(v):
-                            target[k_] = v_
-                            input_[k_] = fake_area[k][k_]
-                        area_loss = BCE_loss(input_,target)
-                        area_loss_dict[k] = area_loss
-
-                    all_areas_loss = sum(area_loss_dict.values())
-                    g_loss = -torch.mean(fake_validity) + 6 * pos_ci_loss + 6 * neg_giou_loss + all_areas_loss
-#output###############                
-                    for k,v in area_loss_dict.items():
-                        area_loss_dict[k] = float(v.detach().cpu().numpy())
-    ###########################
+                if is_mean :
+                    smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
                 else:
+                    smooth_l1 = torch.nn.SmoothL1Loss()
+                #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
+###########################iou loss################
+                #real_iou_norm,fake_iou_norm,real_giou_norm,fake_giou_norm = 
+                # fake_iou_pos,fake_iou_neg,fake_iou_invalid,real_iou_pos,real_iou_neg,real_iou_invalid = compute_iou_norm_v1(real_mks.data, \
+                #                                                 gen_mks, \
+                #                                                 given_eds, nd_to_sample, \
+                #                                                 ed_to_sample,str(batches_done))
+                ###########################vaild################计算慢 和 inf
+                # fake_iou_pos,fake_iou_neg,real_iou_pos,real_iou_neg = compute_iou_norm_v2(real_mks.data, \
+                #                                                 gen_mks, \
+                #                                                 given_eds, nd_to_sample, \
+                #                                                 ed_to_sample,str(batches_done))
+                # fake_pos_giou = [] #iou:0,giou:1,center_inter:2,margin:3
+                # real_pos_giou = []
+                # fake_pos_ci = [] #iou:0,giou:1,center_inter:2,margin:3
+                # real_pos_ci = []
+                # for giou_k,v in fake_iou_pos.items():
+                #     fake_pos_giou.append(v[1])
+                #     real_pos_giou.append(real_iou_pos[giou_k][1])
+                #     fake_pos_ci.append(v[2])
+                #     real_pos_ci.append(real_iou_pos[giou_k][2])
+
+                # fake_neg_giou = [] #iou:0,giou:1,center_inter:2,margin:3
+                # real_neg_giou = []
+                # for giou_k,v in fake_iou_neg.items():
+                #     fake_neg_giou.append(v[1])
+                #     real_neg_giou.append(real_iou_neg[giou_k][1])
+                
+
+                
+                # # fake_pos_giou = transfer_list_to_tensor(fake_pos_giou)
+                # # real_pos_giou = transfer_list_to_tensor(real_pos_giou)
+                # # pos_giou_norm = smooth_l1(fake_pos_giou , real_pos_giou)
+
+                # fake_neg_giou = transfer_list_to_tensor(fake_neg_giou)
+                # real_neg_giou = transfer_list_to_tensor(real_neg_giou)
+                # neg_giou_norm = smooth_l1(fake_neg_giou , real_neg_giou)
+
+                # fake_pos_ci = transfer_list_to_tensor(fake_pos_ci)
+                # real_pos_ci = transfer_list_to_tensor(real_pos_ci)
+                # pos_ci_norm = smooth_l1(fake_pos_ci , real_pos_ci)
+                ###########################
+                # all_fake_giou = torch.cat((fake_pos_giou,fake_neg_giou),0)
+                # all_real_giou = torch.cat((real_pos_giou, real_neg_giou),0)
+                # all_giou_norm = smooth_l1(all_fake_giou , all_real_giou)
+
+                #BCE_logitLoss -> 概率分布的距离 所以要求input and output 要在 [0,1]
+                #d_loss = BCE_logitLoss(real_validity,torch.ones(real_validity.shape)) + BCE_logitLoss(fake_validity,torch.zeros(fake_validity.shape))
+#################################
+                if epoch > extra_loss_lim:
+    #########area#####################
+                    sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
+                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
+                    all_areas_loss = sum(area_dict.values())         
+    ##############################
                     # Update generator
-                    g_loss = -torch.mean(fake_validity) 
+                    g_loss = g_loss  + all_areas_loss + sp 
+                    
+                    area_loss_dict = {}
+                    for k,v in area_dict.items():
+                        area_loss_dict[k] = float(v.data)
+                #+ pos_ci_norm + neg_giou_norm
+                ###debug
+                if torch.isinf(g_loss) :
+                    print("bug data saving")
+                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
+                    print("bug data done")
                 g_loss.backward()
-                # for name, parms in generator.named_parameters():	
-                #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
-                #     ' -->grad_value:',parms.grad)
                 optimizer_G.step()
 
                 if epoch > extra_loss_lim:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[pos_giou_loss:%f]\t[neg_giou_loss:%f]\t[all_giou_loss:%f] "
-                        % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                            d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
-                                ,float(all_areas_loss.detach().cpu().numpy()),str(all_areas_loss.grad_fn),str(area_loss_dict)\
-                                ,float(pos_ci_loss.detach().cpu().numpy()),str(pos_ci_loss.grad_fn),float(pos_giou_loss.detach().cpu().numpy()),float(neg_giou_loss.detach().cpu().numpy()),float(all_giou_loss.detach().cpu().numpy())))
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                            % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
+                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                    ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                    #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
+                                    #,float(pos_giou_norm.data),float(all_giou_norm.data)\
+                                    ,str(sp)\
+                                    ))
                 else:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"
-                        % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                            d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty))
-                               
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                            % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
+                                d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
+                                    # ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)\
+                                    #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
+                                    #,float(pos_giou_norm.data),float(all_giou_norm.data)\
+                                    #,str(sp)
+                                    ))               
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))

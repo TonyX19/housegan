@@ -1117,7 +1117,7 @@ def GIOU (boxes1 , boxes2 ):
     area2 = (xx2-xx1) * (yy2- yy1)
     if area1 == area2 == 0.:
         return [np.array([1.])],[np.array([1.])]
-        
+
     for i in range (num):
         inter_max_x = np.minimum(x2[i], xx2[:])   #求取重合的坐标及面积
         inter_max_y = np.minimum(y2[i], yy2[:])
@@ -1144,6 +1144,68 @@ def GIOU (boxes1 , boxes2 ):
         IOU.append(ious)
         GIOU.append(gious)
     return IOU , GIOU
+
+def GIOU_v1 (center_box , margin_box ):
+    "calculate GIOU  "
+    '''
+    boxes1 shape : shape (n, 4)
+    [extracted_rooms[6][1]]
+    boxes2 shape : shape (k, 4)
+    [extracted_rooms[5][1]]
+    gious: shape (n, k)       
+    '''
+    x1 = center_box[0]
+    y1 = center_box[1]
+    x2 = center_box[2]
+    y2 = center_box[3]
+
+    xx1=margin_box[0]
+    yy1=margin_box[1]
+    xx2=margin_box[2]
+    yy2=margin_box[3]
+
+    area1 = (x2 -x1) * (y2 -y1)  #求取框的面积
+    area2 = (xx2-xx1) * (yy2- yy1)
+    if area1 == area2 == 0.:
+        return 1.,1.,1.,1.
+        
+
+    inter_max_x = np.minimum(x2, xx2)   #求取重合的坐标及面积
+    inter_max_y = np.minimum(y2, yy2)
+    inter_min_x = np.maximum(x1, xx1)
+    inter_min_y = np.maximum(y1, yy1)
+    inter_w = np.maximum(0 ,inter_max_x-inter_min_x)
+    inter_h = np.maximum(0 ,inter_max_y-inter_min_y)
+
+    inter_areas = inter_w * inter_h
+   #print(inter_w , inter_h)
+    out_max_x = np.maximum(x2, xx2)  #求取包裹两个框的集合C的坐标及面积
+    out_max_y = np.maximum(y2, yy2)
+    out_min_x = np.minimum(x1, xx1)
+    out_min_y = np.minimum(y1, yy1)
+    out_w = np.maximum(0, out_max_x - out_min_x)
+    out_h = np.maximum(0, out_max_y - out_min_y)
+
+    outer_areas = out_w * out_h
+    union = area1 + area2 - inter_areas  #两框的总面积   利用广播机制
+    ious = inter_areas / union
+    gious = ious - (outer_areas - union)/outer_areas # IOU - ((C\union）/C)
+    if area1 == 0:
+      area1 = 0.1
+    iou_v1_1 = inter_areas/area1
+    
+    if area2 == 0:
+      area2 = 0.1
+    iou_v1_2 = inter_areas/area2
+    # print("ious :",ious)
+    # print("gious" ,gious)
+    IOU = ious
+    GIOU = gious
+    center_inter = iou_v1_1
+    margin_inter = iou_v1_2
+
+    return IOU ,GIOU ,center_inter ,margin_inter
+
 
 def iou_2(box1,box2):
       assert box1.size == 4 and box2.size == 4,"bounding box coordinate size must be 4"
@@ -1257,3 +1319,10 @@ def combine_images_maps(maps_batch, nodes_batch, edges_batch, \
 #####################
     all_imgs = torch.stack(all_imgs)
     return all_imgs
+
+def transfer_list_to_tensor(data):
+    # target = torch.ones(len(data))
+    # for k_,v in enumerate(data):
+    #     target[k_] = v
+    # return target
+    return torch.stack(data)
