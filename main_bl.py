@@ -332,6 +332,7 @@ if __name__ == '__main__':
                 # Update generator
                 g_loss = -torch.mean(fake_validity)
 
+
                 if is_mean :
                     smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
                 else:
