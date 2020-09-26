@@ -331,7 +331,9 @@ if __name__ == '__main__':
                     #[32, 1]
                 # Update generator
                 g_loss = -torch.mean(fake_validity)
+                g_loss.backward()
 
+                optimizer_G.step()
 
 
                 smooth_l1 = torch.nn.SmoothL1Loss()
@@ -351,9 +353,7 @@ if __name__ == '__main__':
                     print("bug data saving")
                     visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
                     print("bug data done")
-                g_loss.backward()
 
-                optimizer_G.step()
                 print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[gp:%f]\t[sp:%s]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                         % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                             d_loss.item(), g_loss.item(),lambda_gp * gradient_penalty\
