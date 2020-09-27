@@ -458,8 +458,6 @@ def compute_area_list_v1(mask,given_y,nd_to_sample,im_size=256):
             pos = mask[inds_nd][i][mask[inds_nd][i] > 0]
             area = torch.sum(pos)
             _shape = mask[inds_nd][i][mask[inds_nd][i] > 0].size()[0]
-            if _shape == 0:
-                _shape = 1 #避免 real是 infinite
             i+=1
             if room_type not in rooms_areas.keys():
                 rooms_areas[room_type] = [area]
