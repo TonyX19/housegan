@@ -353,13 +353,13 @@ if __name__ == '__main__':
                 if epoch > extra_loss_lim:
 ###########################iou loss################
                     #pos:
-                    common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=l1_loss)
+                    common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
                     #neg:
 #################################
 #########area#####################
                     ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
-                    sp = compute_sparsity_penalty_v2(gen_mks,nd_to_sample,l1_loss)##会修改gen_masks
-                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,l1_loss)
+                    sp = compute_sparsity_penalty_v2(gen_mks,nd_to_sample,smooth_l1)##会修改gen_masks
+                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
                     all_areas_loss = sum(area_dict.values())         
 ##############################
                     # Update generator
