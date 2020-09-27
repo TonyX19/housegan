@@ -393,7 +393,7 @@ def compute_common_area(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ##
     return ret
 
 def compute_avg_loss(gen_mks,criterion):
-    ret_ = torch.zeros(gen_mks.shape[0])
+    ret_ = torch.zeros(gen_mks.shape[0]).to(gen_mks.device)
     for i,mk in enumerate(gen_mks):
         ret_[i] = mk[mk>0].mean()
 
