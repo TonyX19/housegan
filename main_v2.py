@@ -38,7 +38,7 @@ parser.add_argument("--exp_folder", type=str, default='exp', help="destination f
 parser.add_argument("--n_critic", type=int, default=1, help="number of training steps for discriminator per iter")
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 parser.add_argument("--eloss_lim", type=int, default=1, help="extra_loss_limitation")
-parser.add_argument("--is_mean", type=bool, default=True, help="extra_loss_mean")
+parser.add_argument("--is_mean", type=bool, default=False, help="extra_loss_mean")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
@@ -363,10 +363,11 @@ if __name__ == '__main__':
                     # Update generator
                     sp_k = 4
                     area_k = len(area_dict)
+                    cp_k = 10;
                     if not is_mean:
                         sp_k = 1;
                         area_k = 1;
-                    g_loss = g_loss   + sp_k * sp + area_k * all_areas_loss
+                    g_loss = g_loss   + sp_k * sp + area_k * all_areas_loss + cp_k * common_pen
                     ##+ common_pen + 7*all_areas_loss
                     
                     ## area_loss_dict = {}
