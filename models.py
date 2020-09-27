@@ -397,7 +397,7 @@ def compute_avg_loss(gen_mks,criterion):
     for i,mk in enumerate(gen_mks):
         ret_[i] = mk[mk>0].mean()
 
-    return criterion(ret_,torch.ones(gen_mks.shape[0]))
+    return criterion(ret_,torch.ones(gen_mks.shape[0]).to(gen_mks.device))
 
 def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
     maps_batch = x_fake.detach().cpu().numpy()
@@ -465,7 +465,7 @@ def compute_area_norm_penalty_v2(real_mask,fake_mask,given_y,nd_to_sample,criter
     fake_area = compute_area_list_v2(fake_mask,given_y,nd_to_sample)
     area_ret = {}
     for fr_type,f_area_list in fake_area.items():
-        area_ret[fr_type] = criterion(torch.stack(f_area_list),torch.stack(real_area[fr_type]))
+        area_ret[fr_type] = criterion(torch.stack(f_area_list).to(fake_mask.device),torch.stack(real_area[fr_type]).to(fake_mask.device))
 
     return area_ret
 
