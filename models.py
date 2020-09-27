@@ -392,6 +392,13 @@ def compute_common_area(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ##
             
     return ret
 
+def compute_avg_loss(gen_mks,criterion):
+    ret_ = torch.zeros(gen_mks.shape[0])
+    for i,mk in enumerate(gen_mks):
+        ret_[i] = mk[mk>0].mean()
+
+    return criterion(ret_,torch.ones(gen_mks.shape[0]))
+
 def compute_area_list(x_fake,given_y,nd_to_sample,im_size=256):
     maps_batch = x_fake.detach().cpu().numpy()
     nodes_batch = given_y.detach().cpu().numpy()
@@ -441,6 +448,26 @@ def compute_area_norm_penalty(real_mask,fake_mask,given_y,nd_to_sample,criterion
 
     return area_ret
 
+def compute_area_norm_penalty_v1(real_mask,fake_mask,given_y,nd_to_sample,criterion):
+    real_area,real_shape = compute_area_list_v1(real_mask,given_y,nd_to_sample)
+    fake_area,fake_shape = compute_area_list_v1(fake_mask,given_y,nd_to_sample)
+    area_ret = {}
+    for fr_type,f_area_list in fake_area.items():
+        f_area_list = torch.stack(f_area_list)
+        real_area_size = torch.FloatTensor(real_shape[fr_type]).to(f_area_list.device)
+        #用real_shape 可以避免极小值 而来相对固定分母
+        area_ret[fr_type] = criterion(f_area_list/real_area_size,torch.ones(real_area_size.size()[0]))
+
+    return area_ret
+
+def compute_area_norm_penalty_v2(real_mask,fake_mask,given_y,nd_to_sample,criterion):
+    real_area = compute_area_list_v2(real_mask,given_y,nd_to_sample)
+    fake_area = compute_area_list_v2(fake_mask,given_y,nd_to_sample)
+    area_ret = {}
+    for fr_type,f_area_list in fake_area.items():
+        area_ret[fr_type] = criterion(torch.stack(f_area_list),torch.stack(real_area[fr_type]))
+
+    return area_ret
 
 def compute_area_list_v1(mask,given_y,nd_to_sample,im_size=256):
     maps_batch = mask.detach().cpu().numpy()
@@ -467,6 +494,27 @@ def compute_area_list_v1(mask,given_y,nd_to_sample,im_size=256):
             rooms_shape[room_type].append(_shape)
     return rooms_areas,rooms_shape
 
+def compute_area_list_v2(mask,given_y,nd_to_sample,im_size=256):
+    maps_batch = mask.detach().cpu().numpy()
+    nodes_batch = given_y.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    rooms_areas = {}
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置 
+        mks = maps_batch[inds_nd]
+        nds = nodes_batch[inds_nd]
+        i = 0
+        for nd in nds:
+            room_type = str(np.where(nd>0)[0][0])
+            pos = mask[inds_nd][i][mask[inds_nd][i] > 0]
+            area = torch.sum(pos)
+            i+=1
+            if room_type not in rooms_areas.keys():
+                rooms_areas[room_type] = [area]
+                continue;
+            rooms_areas[room_type].append(area)
+    return rooms_areas
+    
 def compute_area(mask,axes):
     #mask [32,32]
     x0, y0, x1, y1 = axes
