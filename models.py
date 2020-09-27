@@ -569,6 +569,71 @@ def compute_sparsity_penalty_v2(masks,nd_to_sample,criterion):
     object_ = torch.zeros(ret_tensor.shape[-1]).to(masks.device)
     return criterion(ret_tensor,object_)
 
+def compute_sparsity_penalty_v3(masks,nd_to_sample,criterion):
+    ret_tensor = torch.zeros(masks.shape[0]).to(masks.device)
+    maps_batch = masks.detach().cpu().numpy()
+    batch_size = torch.max(nd_to_sample) + 1
+    ret = []
+    mks_idx = 0
+    for b in range(batch_size):
+        inds_nd = np.where(nd_to_sample==b) #b ~ b_index #根据坐标获取位置
+        mks = maps_batch[inds_nd]
+
+        for mk in mks:
+            new_mask = torch.zeros(mk.shape).to(masks.device)
+            mk_np = np.around(mk, decimals=1) #精度太低导致弱值发散
+            m_x0, m_y0, m_x1, m_y1 = mask_to_bb(mk)
+            if [m_x0, m_y0, m_x1, m_y1] == [0, 0, 0, 0]:
+                ret_tensor[mks_idx] = torch.tensor(0.)
+                mks_idx +=1
+                continue;
+            
+            if mk_np[m_y0:m_y1,m_x0:m_x1][mk_np[m_y0:m_y1,m_x0:m_x1]>0].size < 2:
+                ret_tensor[mks_idx] = torch.tensor(0.)
+                mks_idx +=1
+                continue;
+            
+            avg_np = mk_np[m_y0:m_y1,m_x0:m_x1][mk_np[m_y0:m_y1,m_x0:m_x1]>0].mean()
+            #avg = mk[fy1:fy2,fx1:fx2][mk[fy1:fy2,fx1:fx2]>0].mean()
+            sp_d = avg_np ### 对于gen_mk[0] 还是存在问题
+            ####max list center axes######
+            x_max_l ,y_max_l = np.where(mk_np==np.max(mk_np))
+            x_max = np.median(x_max_l)
+            y_max = np.median(y_max_l)
+############get noising area########################
+####step 1 get pos area masking ################
+            mk_peak_area = (mk - sp_d)
+            mk[mk_peak_area>0] = 0.
+            noise_x_axis,noise_y_axis = np.array(np.where((mk>0)))
+            dist_list = [];
+
+            for idx,v in enumerate(noise_x_axis):
+                dist = math.sqrt(abs(v - x_max)**2 + abs(noise_y_axis[idx]-y_max)**2)
+                dist_list.append([v,noise_y_axis[idx],dist])
+            
+            if len(dist_list) == 0:
+                ret_tensor[mks_idx] = torch.tensor(0.)
+                mks_idx +=1
+                continue;
+
+            dist_avg = np.array(dist_list)[:,2].mean()
+            for d_v in dist_list:
+                x,y,dist_ = d_v
+                if dist_ > dist_avg:
+                    new_mask[x][y] = (1 - masks[mks_idx][x][y]/sp_d)* dist_ #解决大值样本 loss大 小值样本 loss小
+                else:
+                    new_mask[x][y] = 0.
+
+
+
+            penalty_sum = torch.sum(new_mask[new_mask>0])
+            penalty_rate = ((masks[mks_idx][m_y0:m_y1,m_x0:m_x1]<0).nonzero(as_tuple=False).shape[0]/abs((m_y1 - m_y0)*(m_x1 - m_x0)))
+            penalty = penalty_rate * penalty_sum
+            ret_tensor[mks_idx] = penalty
+            mks_idx +=1
+
+    object_ = torch.zeros(ret_tensor.shape[-1]).to(masks.device)
+    return criterion(ret_tensor,object_)
 
 def compute_sparsity_penalty_v1(masks,nd_to_sample,criterion):
     ret_tensor = torch.zeros(masks.shape[0]).to(masks.device)

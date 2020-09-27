@@ -17,7 +17,7 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tensor
-from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1,compute_sparsity_penalty_v2
+from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1,compute_sparsity_penalty_v2,compute_sparsity_penalty_v3
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -353,19 +353,19 @@ if __name__ == '__main__':
                 if epoch > extra_loss_lim:
 ###########################iou loss################
                     #pos:
-                    common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
+                    common_pen = compute_common_loss(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
                     #neg:
 #################################
 #########area#####################
                     ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
-                    sp = compute_sparsity_penalty_v2(gen_mks,nd_to_sample,smooth_l1)##会修改gen_masks
-                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
+                    sp = compute_sparsity_penalty_v3(gen_mks.clone(),nd_to_sample,smooth_l1)##会修改gen_masks
+                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks.clone(),given_nds,nd_to_sample,smooth_l1)
                     all_areas_loss = sum(area_dict.values())         
 ##############################
                     # Update generator
                     sp_k = 4
                     area_k = len(area_dict)
-                    cp_k = 100;
+                    cp_k = 1;
                     if not is_mean:
                         sp_k = 1;
                         area_k = 1;
