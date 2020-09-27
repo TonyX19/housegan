@@ -389,7 +389,7 @@ if __name__ == '__main__':
                 optimizer_G.step()
 
                 if epoch > extra_loss_lim:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div:%f]\t[sp:%s]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]"#\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div:%f]\t[sp:%s]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[cp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                                 d_loss.item(), g_loss.item(),div_loss\
                                 #lambda_gp * gradient_penalty\
@@ -397,7 +397,7 @@ if __name__ == '__main__':
                                     ,float(area_k * all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)
                                     #,float(pos_ci_norm.data),str(pos_ci_norm.grad_fn),float(neg_giou_norm.data),str(neg_giou_norm.grad_fn)\
                                     #,float(pos_giou_norm.data),float(all_giou_norm.data)\
-                                    #,str(common_pen)\
+                                    ,str(common_pen)\
                                     ))
                 else:
                     print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[div:%f]"#\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
