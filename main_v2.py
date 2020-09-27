@@ -344,26 +344,28 @@ if __name__ == '__main__':
 
                 if is_mean :
                     smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
+                    l1_loss = torch.nn.L1Loss(reduction='mean')
                 else:
-                    smooth_l1 = torch.nn.SmoothL1Loss()
+                    smooth_l1 = torch.nn.SmoothL1Loss(reduction='sum')
+                    l1_loss = torch.nn.L1Loss(reduction='sum')
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
 
                 if epoch > extra_loss_lim:
 ###########################iou loss################
                     #pos:
-                    common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=BCE_loss)
+                    common_pen = compute_common_loss(real_mks.data,gen_mks,given_eds,nd_to_sample,ed_to_sample,criterion=l1_loss)
                     #neg:
 #################################
 #########area#####################
                     ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
-                    sp = compute_sparsity_penalty_v2(gen_mks,nd_to_sample,smooth_l1)##会修改gen_masks
-                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,smooth_l1)
+                    sp = compute_sparsity_penalty_v2(gen_mks,nd_to_sample,l1_loss)##会修改gen_masks
+                    area_dict = compute_area_norm_penalty(real_mks.data,gen_mks,given_nds,nd_to_sample,l1_loss)
                     all_areas_loss = sum(area_dict.values())         
 ##############################
                     # Update generator
                     sp_k = 4
                     area_k = len(area_dict)
-                    cp_k = 10;
+                    cp_k = 100;
                     if not is_mean:
                         sp_k = 1;
                         area_k = 1;
