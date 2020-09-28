@@ -351,25 +351,19 @@ if __name__ == '__main__':
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
                 area_dict = compute_area_norm_penalty_v2(real_mks.data,gen_mks.clone(),given_nds,nd_to_sample,smooth_l1_mean)
                 all_areas_loss = sum(area_dict.values())  
-                g_loss = -torch.mean(fake_validity) + avg_loss + all_areas_loss
+                common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
+                
+                g_loss = -torch.mean(fake_validity) + avg_loss + all_areas_loss + common_pen
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
 
                 if epoch > extra_loss_lim:
-###########################iou loss################
-                    #pos:
-                    common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
-                    #neg:
-#################################
 #########area#####################
                     ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
                     sp = compute_sparsity_penalty_v3(gen_mks.clone(),nd_to_sample,smooth_l1)##会修改gen_masks       
 ##############################
                     # Update generator
-                    sp_k = 4
-                    cp_k = 1;
-                    if not is_mean:
-                        sp_k = 1;
-                    g_loss = g_loss   + sp_k * sp  + cp_k * common_pen
+                    sp_k = 1;
+                    g_loss = g_loss   + sp_k * sp
                     ##+ common_pen + 7*all_areas_loss
                     
                     ## area_loss_dict = {}
