@@ -612,7 +612,7 @@ def compute_sparsity_penalty_v4(masks,criterion):
     for idx in range(masks.shape[0]):
         x0, y0, x1, y1 = mask_to_bb(masks[idx]);
         gap_mask = masks[idx][y0:y1,x0:x1]
-        ret[idx] = torch.sum(gap_mask[gap_mask<0])
+        ret[idx] = torch.sum(gap_mask[gap_mask<=0])
         _shape = gap_mask[gap_mask<0].size()[0]
         object_[idx] = torch.sum(torch.ones(_shape)).to(masks.device)
 
