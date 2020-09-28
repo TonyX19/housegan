@@ -351,7 +351,7 @@ if __name__ == '__main__':
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
                 area_dict = compute_area_norm_penalty_v2(real_mks.data,gen_mks.clone(),given_nds,nd_to_sample,smooth_l1_mean)
                 all_areas_loss = sum(area_dict.values())  
-                common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
+                common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
                 
                 g_loss = -torch.mean(fake_validity) + avg_loss + all_areas_loss + common_pen
                 #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
