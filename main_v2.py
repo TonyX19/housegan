@@ -342,11 +342,11 @@ if __name__ == '__main__':
                     fake_validity = discriminator(gen_mks, given_nds, given_eds, nd_to_sample)
                     #[32, 1]
                 if is_mean :
-                    smooth_l1 = torch.nn.SmoothL1Loss(reduction='mean')
                     l1_loss = torch.nn.L1Loss(reduction='mean')
                 else:
                     smooth_l1 = torch.nn.SmoothL1Loss(reduction='sum')
                     l1_loss = torch.nn.L1Loss(reduction='sum')
+                smooth_l1_mean = torch.nn.SmoothL1Loss(reduction='mean')
 ########################avg loss#########
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
 
@@ -362,7 +362,7 @@ if __name__ == '__main__':
 #########area#####################
                     ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
                     sp = compute_sparsity_penalty_v3(gen_mks.clone(),nd_to_sample,smooth_l1)##会修改gen_masks
-                    area_dict = compute_area_norm_penalty_v2(real_mks.data,gen_mks.clone(),given_nds,nd_to_sample,smooth_l1)
+                    area_dict = compute_area_norm_penalty_v2(real_mks.data,gen_mks.clone(),given_nds,nd_to_sample,smooth_l1_mean)
                     all_areas_loss = sum(area_dict.values())         
 ##############################
                     # Update generator
