@@ -353,7 +353,7 @@ if __name__ == '__main__':
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
                 area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)  
                 common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
-                sp = compute_sparsity_penalty_v4(gen_mks.clone(),smooth_l1)
+                sp = compute_sparsity_penalty_v4(gen_mks.clone(),smooth_l1_mean)
 
 
                 g_loss = -torch.mean(fake_validity) + avg_loss + area_loss + common_pen + sp
