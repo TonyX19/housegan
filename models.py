@@ -409,7 +409,7 @@ def compute_common_area_v1(masks,given_w,nd_to_sample,ed_to_sample,im_size=256):
         margin_mk = masks[d]
         intersection = torch.sum(master_mk[(master_mk >0) & (margin_mk >0)])
         ret.append(intersection)
-             
+
     return torch.stack(ret).to(masks.device)
 
 def compute_avg_loss(gen_mks,criterion):
@@ -537,7 +537,20 @@ def compute_area_list_v2(mask,given_y,nd_to_sample,im_size=256):
                 continue;
             rooms_areas[room_type].append(area)
     return rooms_areas
-    
+
+def compute_area_norm_penalty_v3(real_mask,fake_mask,criterion):
+    real_area = compute_area_list_v3(real_mask)
+    fake_area = compute_area_list_v3(fake_mask)
+
+    return criterion(fake_area,real_area)
+
+def compute_area_list_v3(mask):
+    rooms_areas = torch.zeros(mask.shape[0]).to(mask.device)
+    for idx,mk in enumerate(mask):
+        rooms_areas[idx] = torch.sum(mk[mk>0])
+
+    return rooms_areas
+
 def compute_area(mask,axes):
     #mask [32,32]
     x0, y0, x1, y1 = axes
