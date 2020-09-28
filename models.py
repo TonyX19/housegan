@@ -546,8 +546,8 @@ def compute_area_norm_penalty_v3(real_mask,fake_mask,criterion):
 
 def compute_area_list_v3(mask):
     rooms_areas = torch.zeros(mask.shape[0]).to(mask.device)
-    for idx,mk in enumerate(mask):
-        rooms_areas[idx] = torch.sum(mk[mk>0])
+    for idx in range(mask.shape[0]):
+        rooms_areas[idx] = torch.sum(mask[idx][mask[idx]>0])
 
     return rooms_areas
 
@@ -604,6 +604,19 @@ def compute_sparsity_penalty(masks,given_w,nd_to_sample,criterion):
     ret_tensor = transfer_list_to_tensor(ret)
     object_ = torch.zeros(ret_tensor.shape[-1]).to(masks.device)
     return criterion(ret_tensor,object_)
+
+def compute_sparsity_penalty_v4(masks,criterion):
+    ret = torch.zeros(masks.shape[0]).to(masks.device)
+    object_ = torch.zeros(masks.shape[0]).to(masks.device)
+
+    for idx in range(masks.shape[0]):
+        x0, y0, x1, y1 = mask_to_bb(masks[idx]);
+        gap_mask = masks[idx][y0:y1,x0:x1]
+        ret[idx] = torch.sum(gap_mask[gap_mask<0])
+        _shape = gap_mask[gap_mask<0].size()[0]
+        object_[idx] = torch.sum(torch.ones(_shape)).to(masks.device)
+
+    return criterion(ret,object_)
 
 def compute_sparsity_penalty_v2(masks,nd_to_sample,criterion):
     ret_tensor = torch.zeros(masks.shape[0]).to(masks.device)

@@ -17,8 +17,10 @@ import torch.nn.functional as F
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tensor
-from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_area_norm_penalty_v1,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1,compute_sparsity_penalty_v2,compute_sparsity_penalty_v3,compute_avg_loss\
-    ,compute_area_norm_penalty_v2,compute_common_loss_v1,compute_area_norm_penalty_v3
+from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty\
+    ,compute_sparsity_penalty_v4\
+    ,compute_avg_loss\
+    ,compute_common_loss_v1,compute_area_norm_penalty_v3
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -351,29 +353,11 @@ if __name__ == '__main__':
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
                 area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)  
                 common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
-                
-                g_loss = -torch.mean(fake_validity) + avg_loss + area_loss + common_pen
-                #np.save('./data_debug.npy',[gen_mks,mks, nds, eds, nd_to_sample, ed_to_sample])
+                sp = compute_sparsity_penalty_v4(gen_mks.clone(),smooth_l1)
 
-                if epoch > extra_loss_lim:
-#########area#####################
-                    ##sp = compute_sparsity_penalty(gen_mks,given_eds,nd_to_sample,smooth_l1)
-                    sp = compute_sparsity_penalty_v3(gen_mks.clone(),nd_to_sample,smooth_l1)##会修改gen_masks       
-##############################
-                    # Update generator
-                    sp_k = 1;
-                    g_loss = g_loss   + sp_k * sp
-                    ##+ common_pen + 7*all_areas_loss
-                    
-                    ## area_loss_dict = {}
-                    ## for k,v in area_dict.items():
-                    ##     area_loss_dict[k] = float(v.data)
-                #+ pos_ci_norm + neg_giou_norm
-                ###debug
-                if torch.isinf(g_loss) :
-                    print("bug data saving")
-                    visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
-                    print("bug data done")
+
+                g_loss = -torch.mean(fake_validity) + avg_loss + area_loss + common_pen + sp
+
                 g_loss.backward()
                 # for name, parms in generator.named_parameters():	
                 #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
@@ -381,24 +365,14 @@ if __name__ == '__main__':
 
                 optimizer_G.step()
 
-                if epoch > extra_loss_lim:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
-                            % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                                d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
-                                #lambda_gp * gradient_penalty\
-                                 ,float(area_loss.item()),str(area_loss.grad_fn)
-                                    ,str(common_pen)\
-                                    ,str(sp_k * sp )
-                                    ))
-                else:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]"#\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
-                            % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                                d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
-                                ,area_loss.item(),str(area_loss.grad_fn)\
-                                ,str(common_pen)
-                                #lambda_gp * gradient_penalty\
-                                    #,str(sp)
-                                    ))               
+
+                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                        % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
+                            d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
+                                ,float(area_loss.item()),str(area_loss.grad_fn)
+                                ,str(common_pen)\
+                                ,str(sp)
+                                ))           
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
                     torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
