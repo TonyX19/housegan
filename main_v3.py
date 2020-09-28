@@ -386,7 +386,7 @@ if __name__ == '__main__':
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                                 d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
                                 #lambda_gp * gradient_penalty\
-                                 ,float(area_loss.item()),str(all_areas_loss.grad_fn)
+                                 ,float(area_loss.item()),str(area_loss.grad_fn)
                                     ,str(common_pen)\
                                     ,str(sp_k * sp )
                                     ))
