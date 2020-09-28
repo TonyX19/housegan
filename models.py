@@ -392,6 +392,26 @@ def compute_common_area(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ##
             
     return ret
 
+def compute_common_loss_v1(real_mks,gen_mks, given_eds, nd_to_sample,  ed_to_sample,criterion):
+    real_in_area = compute_common_area_v1(real_mks, given_eds, nd_to_sample,  ed_to_sample)
+    fake_in_area = compute_common_area_v1(gen_mks, given_eds, nd_to_sample,  ed_to_sample)
+
+    return criterion(fake_in_area,real_in_area)
+
+def compute_common_area_v1(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ####only positive
+    edges_batch = given_w.detach().cpu().numpy()
+    pos_edges_batch = edges_batch[edges_batch[:,1]>0]
+    ret = []
+    
+    for ed in pos_edges_batch:
+        s,w,d = ed
+        master_mk = masks[s]
+        margin_mk = masks[d]
+        intersection = torch.sum(master_mk[(master_mk >0) & (margin_mk >0)])
+        ret.append(intersection)
+             
+    return torch.stack(ret).to(masks.device)
+
 def compute_avg_loss(gen_mks,criterion):
     ret_ = torch.zeros(gen_mks.shape[0]).to(gen_mks.device)
     for i,mk in enumerate(gen_mks):

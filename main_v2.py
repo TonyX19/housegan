@@ -18,7 +18,7 @@ import torch
 from PIL import Image, ImageDraw, ImageOps
 from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tensor
 from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty,compute_area_norm_penalty,compute_area_norm_penalty_v1,compute_sparsity_penalty,compute_common_loss,compute_sparsity_penalty_v1,compute_sparsity_penalty_v2,compute_sparsity_penalty_v3,compute_avg_loss\
-    ,compute_area_norm_penalty_v2
+    ,compute_area_norm_penalty_v2,compute_common_loss_v1
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -357,7 +357,7 @@ if __name__ == '__main__':
                 if epoch > extra_loss_lim:
 ###########################iou loss################
                     #pos:
-                    common_pen = compute_common_loss(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
+                    common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
                     #neg:
 #################################
 #########area#####################
@@ -394,14 +394,15 @@ if __name__ == '__main__':
                                 d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
                                 #lambda_gp * gradient_penalty\
                                  ,float(all_areas_loss.data),str(all_areas_loss.grad_fn),str(area_dict)
-                                    ,str(sp_k * sp )\
                                     ,str(common_pen)\
+                                    ,str(sp_k * sp )
                                     ))
                 else:
-                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]"#\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                    print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[area_detail:%s]\t[cp:%s]"#\t[sp:%s]\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                             % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                                 d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
-                                ,all_areas_loss.item(),str(all_areas_loss.grad_fn),str(area_dict)
+                                ,all_areas_loss.item(),str(all_areas_loss.grad_fn),str(area_dict)\
+                                ,str(common_pen)
                                 #lambda_gp * gradient_penalty\
                                     #,str(sp)
                                     ))               
