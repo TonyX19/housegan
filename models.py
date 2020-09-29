@@ -622,16 +622,10 @@ def sparseness(x):
     m =  x.shape[0]
     n =  x.shape[1]
     num = m*n
-
     #分别计算L1和L2范数
-    s1 = torch.tensor(0.).to(x.device);
-    s2 = torch.tensor(0.).to(x.device);
-    for i in range(m):
-        for j in range(n):
-            s1 = s1+x[i,j];
-            s2 = s2+x[i,j]**2;
+    s1 = x.norm(p=1)
+    s2 = x.norm(p=2)
     #计算稀疏度
-    s2 = torch.sqrt(s2);
     c = s1/s2;
     
     a = math.sqrt(num)-c;
