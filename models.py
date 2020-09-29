@@ -617,6 +617,43 @@ def compute_sparsity_penalty_v4(masks,criterion):
         object_[idx] = torch.sum(torch.ones(_shape)).to(masks.device)
 
     return criterion(ret,object_)
+import math
+def sparseness(x):
+    m =  x.shape[0]
+    n =  x.shape[1]
+    num = m*n
+
+    #分别计算L1和L2范数
+    s1 = torch.tensor(0.).to(x.device);
+    s2 = torch.tensor(0.).to(x.device);
+    for i in range(m):
+        for j in range(n):
+            s1 = s1+x[i,j];
+            s2 = s2+x[i,j]**2;
+    #计算稀疏度
+    s2 = torch.sqrt(s2);
+    c = s1/s2;
+    
+    a = math.sqrt(num)-c;
+    b = math.sqrt(num)-1;
+    return a/b;
+
+
+def compute_sparsity_penalty_v5(masks,criterion):
+    ret = torch.zeros(masks.shape[0]).to(masks.device)
+    object_ = torch.zeros(masks.shape[0]).to(masks.device)
+    print(masks.shape[0])
+    for idx in range(masks.shape[0]):
+        x0, y0, x1, y1 = mask_to_bb(masks[idx].detach().cpu().numpy());
+        gap_mask = torch.clamp(masks[idx][y0:y1,x0:x1],min=0.0)
+        if gap_mask.size()[0] == 0:
+            ret[idx] = torch.tensor(1.).to(masks.device)
+            continue
+
+        sp_d = sparseness(gap_mask)
+        ret[idx] = sp_d
+    
+    return criterion(ret,object_)
 
 def compute_sparsity_penalty_v2(masks,nd_to_sample,criterion):
     ret_tensor = torch.zeros(masks.shape[0]).to(masks.device)
