@@ -642,7 +642,9 @@ def compute_sparsity_penalty_v5(masks,criterion):
         if gap_mask.size()[0] == 0:
             ret[idx] = torch.tensor(1.).to(masks.device)
             continue
-
+        if gap_mask.size()[0] == 1: ###nan处理
+            ret[idx] = torch.tensor(0.).to(masks.device)
+            continue
         sp_d = sparseness(gap_mask)
         ret[idx] = sp_d
     
