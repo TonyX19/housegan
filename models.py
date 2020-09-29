@@ -636,7 +636,6 @@ def sparseness(x):
 def compute_sparsity_penalty_v5(masks,criterion):
     ret = torch.zeros(masks.shape[0]).to(masks.device)
     object_ = torch.zeros(masks.shape[0]).to(masks.device)
-    print(masks.shape[0])
     for idx in range(masks.shape[0]):
         x0, y0, x1, y1 = mask_to_bb(masks[idx].detach().cpu().numpy());
         gap_mask = torch.clamp(masks[idx][y0:y1,x0:x1],min=0.0)
