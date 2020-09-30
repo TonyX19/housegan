@@ -394,10 +394,10 @@ def compute_common_area(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ##
 
 def compute_margin(masks):
     ret_tensor = torch.zeros(4).to(masks.device)
-    ret_tensor[0] = torch.sum(masks[:,0]).to(masks.device)
-    ret_tensor[1] = torch.sum(masks[:,:,0]).to(masks.device)
-    ret_tensor[2]  =  torch.sum(masks[:,masks.shape[1]-1]).to(masks.device)
-    ret_tensor[3] = torch.sum(masks[:,:,masks.shape[1]-1]).to(masks.device)
+    ret_tensor[0] = torch.sum(masks[:,0][masks[:,0]>0]).to(masks.device)
+    ret_tensor[1] = torch.sum(masks[:,:,0][masks[:,:,0]>0]).to(masks.device)
+    ret_tensor[2]  =  torch.sum(masks[:,masks.shape[1]-1][masks[:,masks.shape[1]-1]>0]).to(masks.device)
+    ret_tensor[3] = torch.sum(masks[:,:,masks.shape[1]-1][masks[:,:,masks.shape[1]-1]>0]).to(masks.device)
     
     return ret_tensor
 
