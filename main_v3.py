@@ -315,17 +315,16 @@ if __name__ == '__main__':
                 #                                             given_eds.data, nd_to_sample.data,\
                 #                                              ed_to_sample.data,str(batches_done),data_parallel,p=p)
             else:
-                div_loss = compute_div_loss_v1(discriminator, real_mks.data, \
-                                                            gen_mks.data, given_nds.data, \
-                                                            given_eds.data, nd_to_sample.data, \
-                                                            ed_to_sample.data,str(batches_done),None,p=p)
-                # gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                # div_loss = compute_div_loss_v1(discriminator, real_mks.data, \
                 #                                             gen_mks.data, given_nds.data, \
                 #                                             given_eds.data, nd_to_sample.data, \
-                #                                             None, None)
+                #                                             ed_to_sample.data,str(batches_done),None,p=p)
+                gradient_penalty = compute_gradient_penalty(discriminator, real_mks.data, \
+                                                            gen_mks.data, given_nds.data, \
+                                                            given_eds.data, nd_to_sample.data, \
+                                                            None, None)
             
-            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + k*div_loss
-            #+ lambda_gp * gradient_penalty
+            d_loss = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
             
 
             # Update discriminator
@@ -382,9 +381,9 @@ if __name__ == '__main__':
                 optimizer_G.step()
 
 
-                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]\t[sp:%s]\t[m_pen:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[gp:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]\t[sp:%s]\t[m_pen:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                         % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
-                            d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
+                            d_loss.item(), g_loss.item(),avg_loss.item(),gradient_penalty\
                                 ,float(area_loss.item()),str(area_loss.grad_fn)
                                 ,str(common_pen)\
                                 ,str(sp)\
