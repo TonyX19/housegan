@@ -42,6 +42,7 @@ parser.add_argument("--n_critic", type=int, default=1, help="number of training 
 parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 parser.add_argument("--eloss_lim", type=int, default=1, help="extra_loss_limitation")
 parser.add_argument("--is_mean", type=bool, default=False, help="extra_loss_mean")
+parser.add_argument("--resume", type=bool, default=False, help="model resume")
 parser.add_argument("--debug", type=bool, default=False, help="debug")
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
@@ -210,6 +211,18 @@ if __name__ == '__main__':
         optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=opt.g_lr,alpha=0.9) 
         optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=opt.d_lr, alpha=0.9)
 
+    if opt.resume:
+        checkpoint_file = '/Users/home/Dissertation/Code/housegan-div-loss/checkpoints/exp_D_1.pth'
+        if os.path.isfile(checkpoint_file):
+            checkpoint = torch.load(checkpoint_file)
+            start_epoch = checkpoint['epoch'] + 1
+            discriminator.load_state_dict(checkpoint['disc_model'])
+            generator.load_state_dict(checkpoint['generator_model'])
+            optimizer_D.load_state_dict(checkpoint['optimizer_D'])
+            optimizer_G.load_state_dict(checkpoint['optimizer_G'])
+            print("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found")
 
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
@@ -375,7 +388,14 @@ if __name__ == '__main__':
                                 ))           
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
-                    torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
+                    checkpoint = {
+                        'epoch': epoch,
+                        'generator_model': generator.state_dict(),
+                        'disc_model':discriminator.state_dict(),
+                        'optimizer_G': optimizer_G.state_dict(),
+                        'optimizer_D': optimizer_D.state_dict(),
+                    }
+                    torch.save(checkpoint, './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
                     print("checkpoints save done")
                     visualizeBatch(real_mks,gen_mks, given_nds, given_eds, nd_to_sample,ed_to_sample)
                     print("training data save done")
