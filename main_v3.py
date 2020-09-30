@@ -365,14 +365,14 @@ if __name__ == '__main__':
                 smooth_l1_mean = torch.nn.SmoothL1Loss(reduction='mean')
 ########################avg loss#########
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
-                area_loss = common_pen = sp = margin_pen = torch.tensor(0.)
-                g_loss = -torch.mean(fake_validity) + avg_loss 
+                common_pen = sp = torch.tensor(0.)
+                area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)  
+                margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
+                g_loss = -torch.mean(fake_validity) + avg_loss + area_loss + margin_pen
                 
                 if epoch > 0:
-                    area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)  
                     sp = compute_sparsity_penalty_v5(gen_mks.clone(),smooth_l1)
-                    margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
-                    g_loss = g_loss + area_loss  + sp + margin_pen
+                    g_loss = g_loss  + sp
                 
                 if epoch > 2:
                     common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
