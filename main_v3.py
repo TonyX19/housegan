@@ -369,7 +369,7 @@ if __name__ == '__main__':
                 g_loss = -torch.mean(fake_validity) + avg_loss  
                 
 
-                if epoch > 0 or avg_loss.item() < 1.:
+                if epoch > 0:
                     margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
                     area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)  
                     g_loss = g_loss + area_loss + margin_pen
