@@ -28,10 +28,10 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=1000000, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 parser.add_argument("--optim", type=str, default='adam', help="adam: learning rate")
-parser.add_argument("--g_lr", type=float, default=0.0001, help="adam: learning rate")
-parser.add_argument("--d_lr", type=float, default=0.0001, help="adam: learning rate")
+parser.add_argument("--g_lr", type=float, default=0.0002, help="adam: learning rate")
+parser.add_argument("--d_lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=4, help="number of cpu threads to use during batch generation")
@@ -365,8 +365,8 @@ if __name__ == '__main__':
                 smooth_l1_mean = torch.nn.SmoothL1Loss(reduction='mean')
 ########################avg loss#########
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
-                area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1)  
-                common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
+                area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)  
+                common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
                 sp = compute_sparsity_penalty_v5(gen_mks.clone(),smooth_l1)
                 margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
 
