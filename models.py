@@ -392,6 +392,21 @@ def compute_common_area(masks,given_w,nd_to_sample,ed_to_sample,im_size=256): ##
             
     return ret
 
+def compute_margin(masks):
+    ret_tensor = torch.zeros(4).to(masks.device)
+    ret_tensor[0] = torch.sum(masks[:,0]).to(masks.device)
+    ret_tensor[1] = torch.sum(masks[:,:,0]).to(masks.device)
+    ret_tensor[2]  =  torch.sum(masks[:,masks.shape[1]-1]).to(masks.device)
+    ret_tensor[3] = torch.sum(masks[:,:,masks.shape[1]-1]).to(masks.device)
+    
+    return ret_tensor
+
+def compute_margin_penalty(real_mks,gen_mks,criterion):
+    real_m = compute_margin(real_mks)
+    fake_m = compute_margin(gen_mks)
+
+    return criterion(fake_m,real_m)
+
 def compute_common_loss_v1(real_mks,gen_mks, given_eds, nd_to_sample,  ed_to_sample,criterion):
     real_in_area = compute_common_area_v1(real_mks, given_eds, nd_to_sample,  ed_to_sample)
     fake_in_area = compute_common_area_v1(gen_mks, given_eds, nd_to_sample,  ed_to_sample)

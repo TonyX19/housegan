@@ -20,7 +20,8 @@ from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tenso
 from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty\
     ,compute_sparsity_penalty_v5\
     ,compute_avg_loss\
-    ,compute_common_loss_v1,compute_area_norm_penalty_v3
+    ,compute_common_loss_v1,compute_area_norm_penalty_v3\
+    ,compute_margin_penalty
 import os
 from datetime import datetime
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -367,9 +368,9 @@ if __name__ == '__main__':
                 area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1)  
                 common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1)
                 sp = compute_sparsity_penalty_v5(gen_mks.clone(),smooth_l1)
+                margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
 
-
-                g_loss = -torch.mean(fake_validity) + avg_loss + area_loss + common_pen + sp
+                g_loss = -torch.mean(fake_validity) + avg_loss + area_loss + common_pen + sp + margin_pen
 
                 g_loss.backward()
                 # for name, parms in generator.named_parameters():	
@@ -379,12 +380,13 @@ if __name__ == '__main__':
                 optimizer_G.step()
 
 
-                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]\t[sp:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
+                print("[time:%s]\t[Epoch:%d/%d]\t[Batch:%d/%d]\t[Batch_done:%d]\t[D_loss: %f]\t[G_loss: %f]\t[avg:%s]\t[div:%f]\t[area_loss:%f]\t[area_is_grad:%s]\t[cp:%s]\t[sp:%s]\t[m_pen:%s]"#\t[pos_ci_loss:%f]\t[ci_grad:%s]\t[neg_giou_loss:%f]\t[neg_giou_grad:%s]\t[pos_giou_loss:%f]\t[all_giou_loss:%f] "
                         % (str(datetime.now()),epoch, opt.n_epochs, b_idx, len(fp_loader),batches_done, \
                             d_loss.item(), g_loss.item(),avg_loss.item(),div_loss\
                                 ,float(area_loss.item()),str(area_loss.grad_fn)
                                 ,str(common_pen)\
-                                ,str(sp)
+                                ,str(sp)\
+                                ,str(margin_pen)
                                 ))           
                 #print("batches_done: %s samepe_interval: %s eq_val: %s" % (batches_done,opt.sample_interval,(batches_done % opt.sample_interval == 0) and batches_done))
                 if (batches_done % opt.sample_interval == 0) and batches_done:
