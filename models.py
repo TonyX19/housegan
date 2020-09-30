@@ -417,9 +417,12 @@ def compute_common_area_v1(masks,given_w,nd_to_sample,ed_to_sample,im_size=256):
     edges_batch = given_w.detach().cpu().numpy()
     pos_edges_batch = edges_batch[edges_batch[:,1]>0]
     ret = []
-    
+    uinq_list = []
     for ed in pos_edges_batch:
         s,w,d = ed
+        if str(s)+'_'+str(d) in uinq_list:
+            continue;
+        uinq_list.append(str(d)+'_'+str(s))
         master_mk = masks[s]
         margin_mk = masks[d]
         intersection = torch.sum(master_mk[(master_mk >0) & (margin_mk >0)])
