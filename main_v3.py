@@ -20,7 +20,7 @@ from utils import combine_images_maps, rectangle_renderer,transfer_list_to_tenso
 from models import Discriminator, Generator, compute_div_loss_v1, weights_init_normal,compute_gradient_penalty\
     ,compute_sparsity_penalty_v5\
     ,compute_avg_loss\
-    ,compute_common_loss_v1,compute_area_norm_penalty_v3\
+    ,compute_common_loss_v1,compute_area_norm_penalty_v2\
     ,compute_margin_penalty
 import os
 from datetime import datetime
@@ -364,15 +364,17 @@ if __name__ == '__main__':
                 smooth_l1_mean = torch.nn.SmoothL1Loss(reduction='mean')
 ########################avg loss#########
                 avg_loss = compute_avg_loss(gen_mks.clone(),smooth_l1)
-                common_pen  = sp = torch.tensor(0.)
-                margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
-                area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)
-                g_loss = -torch.mean(fake_validity) + avg_loss  + margin_pen + area_loss
+                margin_pen = sp = torch.tensor(0.)
+                #area_loss = compute_area_norm_penalty_v3(real_mks.data,gen_mks.clone(),smooth_l1_mean)
+                area_dict = compute_area_norm_penalty_v2(real_mks.data,gen_mks.clone(),given_nds,nd_to_sample,smooth_l1_mean)
+                area_loss = sum(area_dict.values()) 
+                common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
+                g_loss = -torch.mean(fake_validity) + avg_loss  + area_loss + common_pen
 
                 if epoch > 2:
                     sp = compute_sparsity_penalty_v5(gen_mks.clone(),smooth_l1)
-                    common_pen = compute_common_loss_v1(real_mks.data,gen_mks.clone(),given_eds,nd_to_sample,ed_to_sample,criterion=smooth_l1_mean)
-                    g_loss = g_loss + common_pen+ sp
+                    margin_pen = compute_margin_penalty(real_mks,gen_mks.clone(),smooth_l1)
+                    g_loss = g_loss  + sp + margin_pen
                 g_loss.backward()
                 # for name, parms in generator.named_parameters():	
                 #     print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
