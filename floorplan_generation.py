@@ -47,6 +47,7 @@ checkpoint = './checkpoints/{}_{}_{}.pth'.format(exp_name, target_set, numb_iter
 #checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/eg_exp_31_D_505000.pth'
 checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/exp_demo_D_500000.pth'
 rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/'
+checkpoint = '/home/tony_chen_x19/dataset/exp_demo_D_500000.pth'
 #rooms_path = '/home/tony_chen_x19/dataset/'
 #Initialize variables
 generator = Generator()
@@ -94,7 +95,7 @@ for i, batch in enumerate(fp_iter):
         gen_mks = generator(z, given_nds, given_eds)
         
         
-        all_data.append([gen_mks.numpy(),nds.numpy(),nd_to_sample.numpy(),eds.numpy(),ed_to_sample.numpy()])
+        all_data.append([gen_mks.detach().cpu().numpy(),nds.detach().cpu().numpy(),nd_to_sample.detach().cpu().numpy(),eds.detach().cpu().numpy(),ed_to_sample.detach().cpu().numpy()])
 
 #np.save('./last_v_stats_n',all_data)
 np.save('./housegan_stats',all_data)
