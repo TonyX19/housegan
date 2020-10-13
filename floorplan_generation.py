@@ -29,7 +29,7 @@ import networkx as nx
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_cpu", type=int, default=6, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_cpu", type=int, default=4, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
@@ -44,8 +44,8 @@ exp_name = 'exp_with_graph_global_new'
 target_set = 'D'
 phase='eval'
 checkpoint = './checkpoints/{}_{}_{}.pth'.format(exp_name, target_set, numb_iters)
+#checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/eg_exp_31_D_505000.pth'
 checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/exp_demo_D_500000.pth'
-#checkpoint = '/home/tony_chen_x19/dataset/exp_demo_D_500000.pth'
 rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/'
 #rooms_path = '/home/tony_chen_x19/dataset/'
 #Initialize variables
@@ -56,7 +56,7 @@ if cuda:
     generator.load_state_dict(torch.load(checkpoint))
 else:
 
-    generator.load_state_dict(torch.load(checkpoint,map_location=torch.device('cpu')))
+    generator.load_state_dict(torch.load(checkpoint,map_location=torch.device('cpu')))#['generator_model'])
 
 
 # Initialize dataset iterator
@@ -87,13 +87,14 @@ for i, batch in enumerate(fp_iter):
     given_nds = Variable(nds.type(Tensor))
     given_eds = eds
     
-    for k in range(opt.num_variations):
+    # for k in range(opt.num_variations):
         # plot images
-        z = Variable(Tensor(np.random.normal(0, 1, (real_mks.shape[0], opt.latent_dim))))
-        with torch.no_grad():
-            gen_mks = generator(z, given_nds, given_eds)
+    z = Variable(Tensor(np.random.normal(0, 1, (real_mks.shape[0], opt.latent_dim))))
+    with torch.no_grad():
+        gen_mks = generator(z, given_nds, given_eds)
         
         
-        all_data.append([gen_mks,nds,nd_to_sample,eds,ed_to_sample])
+        all_data.append([gen_mks.numpy(),nds.numpy(),nd_to_sample.numpy(),eds.numpy(),ed_to_sample.numpy()])
 
-np.save('./house_gan_stats',all_data)
+#np.save('./last_v_stats_n',all_data)
+np.save('./housegan_stats',all_data)
