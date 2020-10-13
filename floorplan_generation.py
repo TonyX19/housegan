@@ -45,8 +45,9 @@ target_set = 'D'
 phase='eval'
 checkpoint = './checkpoints/{}_{}_{}.pth'.format(exp_name, target_set, numb_iters)
 checkpoint = '/Users/home/Dissertation/Code/dataSet/house_gan/exp_demo_D_500000.pth'
+#checkpoint = '/home/tony_chen_x19/dataset/exp_demo_D_500000.pth'
 rooms_path = '/Users/home/Dissertation/Code/dataSet/dataset_paper/'
-
+#rooms_path = '/home/tony_chen_x19/dataset/'
 #Initialize variables
 generator = Generator()
 cuda = True if torch.cuda.is_available() else False
@@ -90,12 +91,9 @@ for i, batch in enumerate(fp_iter):
         # plot images
         z = Variable(Tensor(np.random.normal(0, 1, (real_mks.shape[0], opt.latent_dim))))
         with torch.no_grad():
-            gen_mks = generator(z, given_nds, given_eds.cpu())
-            gen_bbs = np.array([np.array(mask_to_bb(mk)) for mk in gen_mks.detach().cpu()])
-            real_bbs = np.array([np.array(mask_to_bb(mk)) for mk in real_mks.detach().cpu()])
-            real_nodes = np.where(given_nds.detach().cpu()==1)[-1]
+            gen_mks = generator(z, given_nds, given_eds)
         
         
-        all_data.append([np.array(gen_mks),np.array(nds),np.array(nd_to_sample),np.array(eds),np.array(ed_to_sample)])
+        all_data.append([gen_mks,nds,nd_to_sample,eds,ed_to_sample])
 
 np.save('./house_gan_stats',all_data)
